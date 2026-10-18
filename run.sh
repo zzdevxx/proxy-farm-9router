@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# proxy-farm-9router — 1-Click Auto Bot
-# Klik ganda di Desktop -> langsung auto-farm otomatis (atau tekan 2 untuk recheck saja).
+# proxy-farm-9router — Murni 1-Klik Auto Bot
+# Klik ganda di Desktop -> langsung auto-farm detik itu juga tanpa tanya-tanya.
 
 set -uo pipefail
 cd "$(dirname "$(readlink -f "$0")")"
@@ -17,41 +17,18 @@ echo "  ╔═══════════════════════
 echo "  ║             🌾 PROXY FARM 9ROUTER — AUTO SYNC BOT 🚀           ║"
 echo "  ╚════════════════════════════════════════════════════════════════╝"
 echo "${C_RST}"
-
-# Jika ada argumen CLI langsung diteruskan (misal ./run.sh --dry-run)
-if [ $# -gt 0 ]; then
-  python3 farm.py "$@"
-  exit $?
-fi
-
-echo "  ${C_YEL}⏳ Auto-Farm berjalan otomatis dalam 4 detik...${C_RST}"
-echo "     • Tekan ${C_BLD}ENTER${C_RST} / tunggu untuk Farm Penuh (Tarik 37 Sumber + Bersihkan DB)."
-echo "     • Tekan ${C_BLD}[2]${C_RST} jika hanya ingin Quick Recheck (Pangkas yang mati saja)."
+echo "  🚀 Menjalankan Auto-Farm Penuh..."
+echo "     • Recheck & pangkas proxy mati dari DB 9Router (strike >= 2)"
+echo "     • Tarik proxy fresh dari 44 sumber global (termasuk pre-checked)"
+echo "     • Uji tunnel HTTPS CONNECT nyata (TLS handshake & anti-leak)"
+echo "     • Deteksi negara batch GeoIP ([ID], [SG], [US], [VN], dll)"
+echo "     • Suntikkan ratusan proxy fresh ke DB & rapikan urutan"
+echo "     • 50 Relay Cloudflare & Vercel Anda 100% aman (READ-ONLY)"
+echo "  ────────────────────────────────────────────────────────────────"
 echo
 
-read -t 4 -n 1 -rp "  Pilihan Anda [1/2]: " choice || choice="1"
-echo
-
-if [ "${choice:-1}" = "2" ]; then
-  echo "${C_CYN}  ⚡ Menjalankan Quick Recheck DB 9Router...${C_RST}"
-  echo "     • Menguji ulang seluruh proxy di database 9Router"
-  echo "     • Memangkas proxy yang sudah mati"
-  echo "  ────────────────────────────────────────────────────────────────"
-  echo
-  python3 verify_9router.py
-  status=$?
-else
-  echo "${C_CYN}  🚀 Menjalankan Auto-Farm Penuh...${C_RST}"
-  echo "     • Recheck & pangkas proxy mati dari DB 9Router (strike >= 2)"
-  echo "     • Tarik proxy fresh dari 44 sumber global (termasuk pre-checked hourly feeds)"
-  echo "     • Uji tunnel HTTPS CONNECT nyata (TLS handshake & anti-leak)"
-  echo "     • Suntikkan ratusan proxy fresh ke DB & rapikan urutan"
-  echo "     • 50 Relay Cloudflare & Vercel Anda 100% aman (READ-ONLY)"
-  echo "  ────────────────────────────────────────────────────────────────"
-  echo
-  python3 farm.py
-  status=$?
-fi
+python3 farm.py "$@"
+status=$?
 
 echo
 echo "  ────────────────────────────────────────────────────────────────"
