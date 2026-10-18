@@ -18,7 +18,7 @@ connect_timeout = 4.0
 #  2. Tidak mengembalikan HTML error / Cloudflare 403 palsu.
 #  3. Tidak membocorkan IP lokal mesin.
 exit_ip_endpoints = ["https://api.ipify.org", "https://icanhazip.com"]
-deep_test_top_n = 800
+deep_test_top_n = 1000
 deep_test_timeout = 5.0
 
 # Proxy yang gagal uji: diberi tenggat (strike) sebelum dihapus.

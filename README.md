@@ -3,8 +3,8 @@
 <p align="center">
   <img src="https://img.shields.io/badge/Python-3.11%20%7C%203.12-blue?style=for-the-badge&logo=python&logoColor=white" alt="Python Version" />
   <img src="https://img.shields.io/badge/License-MIT-green?style=for-the-badge" alt="MIT License" />
-  <img src="https://img.shields.io/badge/Feeds-37%20Sources-purple?style=for-the-badge&logo=github" alt="37 Sources" />
-  <img src="https://img.shields.io/badge/Candidate%20Pool-620k%2B-orange?style=for-the-badge" alt="620k+ Candidates" />
+  <img src="https://img.shields.io/badge/Feeds-44%20Sources-purple?style=for-the-badge&logo=github" alt="44 Sources" />
+  <img src="https://img.shields.io/badge/Candidate%20Pool-640k%2B-orange?style=for-the-badge" alt="640k+ Candidates" />
   <img src="https://img.shields.io/badge/Protocols-HTTP%20%7C%20HTTPS%20%7C%20SOCKS5-blueviolet?style=for-the-badge" alt="Protocols" />
   <img src="https://img.shields.io/badge/Integration-9Router%20Compatible-red?style=for-the-badge" alt="9Router Compatible" />
 </p>
@@ -26,7 +26,8 @@ Kebanyakan proxy scraper publik memasukkan ribuan proxy mati atau proxy palsu ya
 ## 🚀 Fitur Utama
 
 - 🖱️ **Murni 1-Klik di Desktop (Auto-Run 4 Detik):** Cukup klik ganda shortcut di Desktop. Program langsung otomatis mulai dalam 4 detik (atau tekan `2` untuk quick recheck). Menampilkan progres rapi dan menutup otomatis setelah selesai.
-- 🌐 **Koleksi 37 Sumber Global:** Mengambil lebih dari **620.000 kandidat** (338.000+ IP unik) dari repositori terkurasi (monosans, geonode, proxyscrape v2/v4, proxifly, hookzof, murongpig, zevtyardt, b4rc0de, roosterkid, dll).
+- 🌐 **Koleksi 44 Sumber Global (Termasuk Pre-Checked Feeds):** Mengambil lebih dari **640.000 kandidat** (343.000+ IP unik) dari repositori terkurasi (dinoz0rg, xyzs996, proxyspace, monosans, geonode, proxyscrape v2/v4, proxifly, hookzof, murongpig, zevtyardt, b4rc0de, roosterkid, dll).
+- 🏷️ **Batch GeoIP & Pelabelan Negara Otomatis:** Otomatis mendeteksi dan memberi label kode negara (`[ID]`, `[SG]`, `[US]`, `[VN]`, `[PH]`) pada nama proxy yang masuk ke 9Router via batch endpoint 100 IP/request.
 - ⚖️ **Fair Round-Robin Sampling:** Sumber masif (100k+) tidak memonopoli slot kandidat; setiap repo mendapat jatah sampling berimbang.
 - 🔒 **Verifikasi HTTPS CONNECT Nyata:** Memvalidasi handshake TLS sungguhan dan memverifikasi respon IP menggunakan parser `ipaddress` murni—menolak 100% halaman CAPTCHA dan error HTML Cloudflare.
 - 🛡️ **Triple-Layer Relay Guard:** Relay Vercel dan Cloudflare Worker bawaan Anda (`*.unnesdev.workers.dev`) **100% READ-ONLY** dan terlindungi di 3 lapis sistem (*scope allowlist* ➔ *db query filter* ➔ *pre-commit assertion*).

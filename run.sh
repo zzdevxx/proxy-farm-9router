@@ -43,7 +43,7 @@ if [ "${choice:-1}" = "2" ]; then
 else
   echo "${C_CYN}  🚀 Menjalankan Auto-Farm Penuh...${C_RST}"
   echo "     • Recheck & pangkas proxy mati dari DB 9Router (strike >= 2)"
-  echo "     • Tarik proxy fresh dari 37 sumber global terkurasi"
+  echo "     • Tarik proxy fresh dari 44 sumber global (termasuk pre-checked hourly feeds)"
   echo "     • Uji tunnel HTTPS CONNECT nyata (TLS handshake & anti-leak)"
   echo "     • Suntikkan ratusan proxy fresh ke DB & rapikan urutan"
   echo "     • 50 Relay Cloudflare & Vercel Anda 100% aman (READ-ONLY)"

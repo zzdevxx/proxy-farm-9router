@@ -2,6 +2,62 @@
   "$comment": "Katalog sumber proxy publik terverifikasi (25+ feeds). Diperbarui otomatis dari berbagai repo scraper aktif.",
   "sources": [
     {
+      "id": "dinoz0rg-checked-http",
+      "parser": "text_ipport",
+      "url": "https://raw.githubusercontent.com/dinoz0rg/proxy-list/refs/heads/main/checked_proxies/http.txt",
+      "protocol": "http",
+      "enabled": true,
+      "note": "Pre-checked hourly by GitHub Actions (2.6k+ alive)"
+    },
+    {
+      "id": "dinoz0rg-checked-socks5",
+      "parser": "text_ipport",
+      "url": "https://raw.githubusercontent.com/dinoz0rg/proxy-list/refs/heads/main/checked_proxies/socks5.txt",
+      "protocol": "socks5",
+      "enabled": true,
+      "note": "Pre-checked hourly by GitHub Actions (2.9k+ alive)"
+    },
+    {
+      "id": "xyzs996-health-http",
+      "parser": "text_ipport",
+      "url": "https://raw.githubusercontent.com/xyzs996/free-proxy-health-list/refs/heads/main/proxies/protocols/http/data.txt",
+      "protocol": "http",
+      "enabled": true,
+      "note": "Pre-checked health list (3.7k+ active)"
+    },
+    {
+      "id": "xyzs996-health-https",
+      "parser": "text_ipport",
+      "url": "https://raw.githubusercontent.com/xyzs996/free-proxy-health-list/refs/heads/main/proxies/protocols/https/data.txt",
+      "protocol": "https",
+      "enabled": true,
+      "note": "Pre-checked HTTPS health list (3.7k+ active)"
+    },
+    {
+      "id": "elliott-checked-socks5",
+      "parser": "text_ipport",
+      "url": "https://raw.githubusercontent.com/elliottophellia/proxylist/refs/heads/master/results/socks5/global/socks5_checked.txt",
+      "protocol": "socks5",
+      "enabled": true,
+      "note": "Verified SOCKS5 checked list"
+    },
+    {
+      "id": "proxyspace-https",
+      "parser": "text_ipport",
+      "url": "https://proxyspace.pro/https.txt",
+      "protocol": "https",
+      "enabled": true,
+      "note": "Proxyspace active HTTPS proxies"
+    },
+    {
+      "id": "zloi-connect",
+      "parser": "text_ipport",
+      "url": "https://raw.githubusercontent.com/zloi-user/hideip.me/refs/heads/main/connect.txt",
+      "protocol": "http",
+      "enabled": true,
+      "note": "Verified HTTPS CONNECT capable proxies"
+    },
+    {
       "id": "monosans",
       "parser": "monosans_json",
       "url": "https://raw.githubusercontent.com/monosans/proxy-list/main/proxies.json",
