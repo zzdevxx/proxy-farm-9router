@@ -159,6 +159,48 @@ groups = ["http", "vercel", "cloudflare"]
 
 ---
 
+## ⚠️ Disclaimer & Batasan Penggunaan
+
+**Baca sebelum memakai.**
+
+### Untuk apa repo ini
+
+Alat ini mengumpulkan daftar proxy publik yang **sudah tersedia terbuka** di
+internet (26 feed publik), menguji apakah proxy tersebut benar-benar bisa
+melakukan HTTPS CONNECT, lalu menyuntikkan yang lolos ke database 9Router
+milik Anda sendiri. Tidak ada server pihak ketiga yang dipindai, diuji
+beban, atau diserang.
+
+### Batasan yang harus dipatuhi
+
+1. **Proxy publik tidak aman untuk data sensitif.** Operator proxy bisa
+   melihat metadata koneksi Anda. Jangan pernah mengirim kredensial, token,
+   prompt, atau data pribadi melalui proxy publik.
+
+2. **Menggunakan proxy untuk melewati batas layanan (rate limit, kuota,
+   geo-restriction) penyedia AI dapat melanggar Terms of Service mereka.**
+   Repo ini menyediakan mekanismenya, bukan izinnya. Tanggung jawab mematuhi
+   ToS setiap penyedia sepenuhnya ada pada Anda.
+
+3. **Gunakan hanya untuk layanan yang Anda miliki atau yang mengizinkannya.**
+   Jangan memakai proxy untuk mengakses sistem tanpa izin.
+
+4. **Tidak ada jaminan kualitas.** Proxy gratis sering mati, lambat, atau
+   berbahaya. Alat ini memfilter yang tidak berfungsi, tetapi tidak bisa
+   menjamin keamanan operatornya.
+
+### Sikap proyek ini
+
+Repo ini dipublikasikan untuk **pembelajaran** tentang jaringan, TLS, dan
+manajemen koneksi — bukan sebagai alat untuk melanggar ketentuan layanan
+pihak lain. Penulis tidak bertanggung jawab atas penyalahgunaan.
+
+Kalau Anda tidak yakin apakah penggunaan Anda melanggar ToS suatu layanan,
+**jangan pakai alat ini untuk layanan tersebut.**
+
+
+---
+
 ## 📄 Lisensi
 
 Proyek ini dilisensikan di bawah [MIT License](LICENSE) © 2026 Andreas ([@zzdree](https://github.com/zzdree)).
