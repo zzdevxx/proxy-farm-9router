@@ -32,6 +32,7 @@ import tomllib
 
 from src import db as dbmod
 from src import fetch as fetch_mod
+from src import geo as geomod
 from src import report as report_mod
 from src import testers
 
@@ -255,6 +256,15 @@ async def run(args) -> int:
             if done % 250 == 0 or done == total:
                 progress(done, total, f"hidup={alive_new}")
         print(f"  [5b] kandidat baru: {alive_new} hidup / {total - alive_new} mati")
+
+        # ── 5c) enrich GeoIP / negara untuk proxy yang hidup ────────────
+        alive_fresh = [(c, v) for c, v in new_results if v.alive]
+        if alive_fresh:
+            print(f"  [5c] deteksi negara untuk {len(alive_fresh)} proxy hidup (batch GeoIP)...")
+            geo_stats = geomod.enrich_verdicts_geo(new_results, timeout=6.0)
+            if geo_stats:
+                top_cc = ", ".join(f"{cc}={cnt}" for cc, cnt in list(geo_stats.items())[:8])
+                print(f"       Negara: {top_cc}")
 
         if args.dry_run:
             print("\n  [6] DRY-RUN: tidak menulis kandidat baru ke DB")

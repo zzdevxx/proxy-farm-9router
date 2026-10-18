@@ -189,9 +189,14 @@ def mark_result(con, pid: str, verdict, *, is_new_row: bool, now: str) -> dict:
 
 
 def insert_new(con, cand, verdict, now: str) -> None:
-    """Masukkan proxy baru yang lolos uji."""
+    """Masukkan proxy baru yang lolos uji (dengan label negara bila terdeteksi)."""
+    cc = getattr(verdict, "country_code", None)
+    c_name = getattr(verdict, "country", None)
+    isp = getattr(verdict, "isp", None)
+
+    prefix = f"[{cc}] " if cc and cc != "??" else ""
     payload = {
-        "name": f"farm-{cand.protocol}-{cand.host}:{cand.port}",
+        "name": f"{prefix}farm-{cand.protocol}-{cand.host}:{cand.port}",
         "proxyUrl": cand.proxy_url,
         "noProxy": "",
         "type": "http",
@@ -202,6 +207,12 @@ def insert_new(con, cand, verdict, now: str) -> None:
         "lastTestedAt": now,
         "strikes": 0,
     }
+    if cc and cc != "??":
+        payload["country"] = cc
+    if c_name and c_name != "Unknown":
+        payload["countryName"] = c_name
+    if isp and isp != "-":
+        payload["isp"] = isp
     if verdict.latency_ms is not None:
         payload["latencyMs"] = verdict.latency_ms
     con.execute(
