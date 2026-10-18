@@ -68,7 +68,7 @@ Kebanyakan proxy scraper publik memasukkan ribuan proxy mati atau proxy palsu ya
 
 ### 1. Kloning Repositori
 ```bash
-git clone https://github.com/zzdree/proxy-farm-9router.git
+git clone https://gitlab.com/zzdree/proxy-farm-9router.git
 cd proxy-farm-9router
 ```
 
