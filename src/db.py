@@ -107,8 +107,14 @@ def order_rows(con, groups: list[str], top_id: str | None = None) -> int:
     )
     n = 0
     for g in groups:
-        # internal blok: urutkan by name biar deterministik
-        for r in sorted(by_type[g], key=lambda x: x["name"] or ""):
+        # Urutkan berdasarkan prioritas: aktif dulu -> latensi terendah (tercepat) -> nama
+        def sort_key(x):
+            is_inactive = 0 if x.get("testStatus") == "active" else 1
+            lat = (x.get("data") or {}).get("latencyMs")
+            lat_val = lat if (lat is not None and lat > 0) else 999999
+            return (is_inactive, lat_val, x.get("name") or "")
+
+        for r in sorted(by_type[g], key=sort_key):
             ts = (base - datetime.timedelta(milliseconds=n))
             con.execute(
                 "UPDATE proxyPools SET updatedAt=? WHERE id=?", (_iso(ts), r["id"])

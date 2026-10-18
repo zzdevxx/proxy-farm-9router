@@ -333,6 +333,86 @@
       "protocol": "socks5",
       "enabled": true,
       "note": "ProxyScrape v2 displayproxies SOCKS5 (from PetaniProxy)"
+    },
+    {
+      "id": "databay-http",
+      "parser": "text_ipport",
+      "url": "https://raw.githubusercontent.com/databay-labs/free-proxy-list/refs/heads/master/http.txt",
+      "protocol": "http",
+      "enabled": true,
+      "note": "6.9k+ HTTP proxies from databay-labs"
+    },
+    {
+      "id": "databay-socks5",
+      "parser": "text_ipport",
+      "url": "https://raw.githubusercontent.com/databay-labs/free-proxy-list/refs/heads/master/socks5.txt",
+      "protocol": "socks5",
+      "enabled": true,
+      "note": "SOCKS5 proxies from databay-labs"
+    },
+    {
+      "id": "hproxy-http",
+      "parser": "text_ipport",
+      "url": "https://raw.githubusercontent.com/hproxy-com/free-proxy-list/refs/heads/main/http.txt",
+      "protocol": "http",
+      "enabled": true,
+      "note": "3.8k+ HTTP proxies from hproxy"
+    },
+    {
+      "id": "hproxy-https",
+      "parser": "text_ipport",
+      "url": "https://raw.githubusercontent.com/hproxy-com/free-proxy-list/refs/heads/main/https.txt",
+      "protocol": "https",
+      "enabled": true,
+      "note": "3.5k+ HTTPS proxies from hproxy"
+    },
+    {
+      "id": "dpangestuw-socks5",
+      "parser": "text_ipport",
+      "url": "https://raw.githubusercontent.com/dpangestuw/Free-Proxy/refs/heads/main/socks5_proxies.txt",
+      "protocol": "socks5",
+      "enabled": true,
+      "note": "7.5k+ SOCKS5 proxies from dpangestuw"
+    },
+    {
+      "id": "iplocate-socks5",
+      "parser": "text_ipport",
+      "url": "https://raw.githubusercontent.com/iplocate/free-proxy-list/refs/heads/main/protocols/socks5.txt",
+      "protocol": "socks5",
+      "enabled": true,
+      "note": "2k+ SOCKS5 proxies from iplocate"
+    },
+    {
+      "id": "proxy-free-socks5",
+      "parser": "text_ipport",
+      "url": "https://raw.githubusercontent.com/proxy-free/free-proxy-list/refs/heads/main/socks5.txt",
+      "protocol": "socks5",
+      "enabled": true,
+      "note": "1.8k+ SOCKS5 proxies from proxy-free"
+    },
+    {
+      "id": "proxywhirl-socks5",
+      "parser": "text_ipport",
+      "url": "https://raw.githubusercontent.com/wyattowalsh/proxywhirl/refs/heads/main/web/public/proxy-lists/socks5.txt",
+      "protocol": "socks5",
+      "enabled": true,
+      "note": "Curated SOCKS5 proxies from proxywhirl"
+    },
+    {
+      "id": "stormsia-socks5",
+      "parser": "text_ipport",
+      "url": "https://raw.githubusercontent.com/stormsia/proxy-list/refs/heads/main/socks5.txt",
+      "protocol": "socks5",
+      "enabled": true,
+      "note": "Curated SOCKS5 proxies from stormsia"
+    },
+    {
+      "id": "tuanminpay-socks5",
+      "parser": "text_ipport",
+      "url": "https://raw.githubusercontent.com/TuanMinPay/live-proxy/refs/heads/master/socks5.txt",
+      "protocol": "socks5",
+      "enabled": true,
+      "note": "Live SOCKS5 proxies from TuanMinPay"
     }
   ]
 }

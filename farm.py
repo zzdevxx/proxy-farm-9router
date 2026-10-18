@@ -142,17 +142,22 @@ async def run(args) -> int:
               ", ".join(f"{k}={v}" for k, v in sorted(by_type_before.items())))
 
         # ── 2) fetch kandidat baru + dedup ────────────────────────────────
-        cands = await fetch_mod.gather(
-            sources, farm_cfg.get("max_candidates", 8000), farm_cfg.get("concurrency", 250)
-        )
-        if not cands:
-            print("tidak ada kandidat — semua sumber mati?", file=sys.stderr)
-            return 1
+        if args.recheck_only:
+            print("\n  [1] --recheck-only: lewati unduhan sumber baru")
+            cands = []
+            fresh = []
+        else:
+            cands = await fetch_mod.gather(
+                sources, farm_cfg.get("max_candidates", 8000), farm_cfg.get("concurrency", 250)
+            )
+            if not cands:
+                print("tidak ada kandidat — semua sumber mati?", file=sys.stderr)
+                return 1
 
-        # kandidat yang belum ada di DB (berdasarkan proxyUrl)
-        known_urls = {r["proxyUrl"] for r in before if r["proxyUrl"]}
-        fresh = [c for c in cands if c.proxy_url not in known_urls]
-        print(f"  [2b] {len(fresh)} kandidat benar-benar baru (sisanya sudah ada di DB)")
+            # kandidat yang belum ada di DB (berdasarkan proxyUrl)
+            known_urls = {r["proxyUrl"] for r in before if r["proxyUrl"]}
+            fresh = [c for c in cands if c.proxy_url not in known_urls]
+            print(f"  [2b] {len(fresh)} kandidat benar-benar baru (sisanya sudah ada di DB)")
 
         # ── 3) RECHECK baris lama (hanya type dalam scope.recheck_types) ──
         recheck_types = set(scope["recheck_types"])
@@ -232,39 +237,42 @@ async def run(args) -> int:
                 print(f"      dilewati (terikat koneksi): {len(prune_stats['skipped_bound'])}")
 
         # ── 5) INJECT kandidat baru (uji dulu, baru tulis) ───────────────
-        print(f"\n  [5] UJI {human(len(fresh))} kandidat baru (tcp dulu, "
-              f"exit-IP utk {min(len(fresh), deep_n)} tercepat)")
-
-        async def probe_fresh(c):
-            async with sem:
-                host, port = c.host, c.port
-                tcp = await testers.tcp_probe(host, port, tcp_to)
-                if not tcp.alive:
-                    return c, tcp
-                return c, await testers.live_probe(c.proxy_url, endpoints, deep_to, lip)
-
         new_results = []
-        done = 0
-        total = len(fresh)
         alive_new = 0
-        for fut in asyncio.as_completed([probe_fresh(c) for c in fresh]):
-            cand, verdict = await fut
-            new_results.append((cand, verdict))
-            if verdict.alive:
-                alive_new += 1
-            done += 1
-            if done % 250 == 0 or done == total:
-                progress(done, total, f"hidup={alive_new}")
-        print(f"  [5b] kandidat baru: {alive_new} hidup / {total - alive_new} mati")
+        if not args.recheck_only and fresh:
+            print(f"\n  [5] UJI {human(len(fresh))} kandidat baru (tcp dulu, "
+                  f"exit-IP utk {min(len(fresh), deep_n)} tercepat)")
 
-        # ── 5c) enrich GeoIP / negara untuk proxy yang hidup ────────────
-        alive_fresh = [(c, v) for c, v in new_results if v.alive]
-        if alive_fresh:
-            print(f"  [5c] deteksi negara untuk {len(alive_fresh)} proxy hidup (batch GeoIP)...")
-            geo_stats = geomod.enrich_verdicts_geo(new_results, timeout=6.0)
-            if geo_stats:
-                top_cc = ", ".join(f"{cc}={cnt}" for cc, cnt in list(geo_stats.items())[:8])
-                print(f"       Negara: {top_cc}")
+            async def probe_fresh(c):
+                async with sem:
+                    host, port = c.host, c.port
+                    tcp = await testers.tcp_probe(host, port, tcp_to)
+                    if not tcp.alive:
+                        return c, tcp
+                    return c, await testers.live_probe(c.proxy_url, endpoints, deep_to, lip)
+
+            done = 0
+            total = len(fresh)
+            for fut in asyncio.as_completed([probe_fresh(c) for c in fresh]):
+                cand, verdict = await fut
+                new_results.append((cand, verdict))
+                if verdict.alive:
+                    alive_new += 1
+                done += 1
+                if done % 250 == 0 or done == total:
+                    progress(done, total, f"hidup={alive_new}")
+            print(f"  [5b] kandidat baru: {alive_new} hidup / {total - alive_new} mati")
+
+            # ── 5c) enrich GeoIP / negara untuk proxy yang hidup ────────────
+            alive_fresh = [(c, v) for c, v in new_results if v.alive]
+            if alive_fresh:
+                print(f"  [5c] deteksi negara untuk {len(alive_fresh)} proxy hidup (batch GeoIP)...")
+                geo_stats = geomod.enrich_verdicts_geo(new_results, timeout=6.0)
+                if geo_stats:
+                    top_cc = ", ".join(f"{cc}={cnt}" for cc, cnt in list(geo_stats.items())[:8])
+                    print(f"       Negara: {top_cc}")
+        elif args.recheck_only:
+            print("\n  [5] --recheck-only: lewati pengujian kandidat baru")
 
         if args.dry_run:
             print("\n  [6] DRY-RUN: tidak menulis kandidat baru ke DB")
@@ -394,6 +402,8 @@ def main():
     p.add_argument("--mode", choices=["deep", "tcp"], default=None,
                    help="deep = TCP + exit-IP (default), tcp = TCP saja")
     p.add_argument("--limit-sources", default=None, help="id sumber, koma dipisah")
+    p.add_argument("--recheck-only", action="store_true",
+                   help="hanya uji ulang dan pangkas proxy lama di DB, lewati fetch baru")
     args = p.parse_args()
     try:
         raise SystemExit(asyncio.run(run(args)))
