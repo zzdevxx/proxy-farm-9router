@@ -66,16 +66,16 @@ def batch_lookup_geoip(
 
 def enrich_verdicts_geo(
     new_results: list[tuple[Any, Any]], timeout: float = 6.0
-) -> dict[str, int]:
-    """Isi metadata negara pada verdict kandidat yang hidup.
+) -> tuple[dict[str, int], dict[str, int]]:
+    """Isi metadata negara & ISP pada verdict kandidat yang hidup.
 
-    Mengembalikan distribusi frekuensi negara: {"SG": 45, "ID": 20, ...}
+    Mengembalikan tuple: (distribusi_negara, distribusi_isp)
     """
     alive_items = [
         (c, v) for c, v in new_results if getattr(v, "alive", False)
     ]
     if not alive_items:
-        return {}
+        return {}, {}
 
     # Kumpulkan target IP: utamakan exit_ip nyata jika ada, fallback ke c.host
     ips_to_query = []
@@ -87,6 +87,7 @@ def enrich_verdicts_geo(
     geo_map = batch_lookup_geoip(ips_to_query, timeout=timeout)
 
     country_counts: dict[str, int] = {}
+    isp_counts: dict[str, int] = {}
     for c, v in alive_items:
         target_ip = getattr(v, "exit_ip", None) or getattr(c, "host", "")
         geo = geo_map.get(target_ip, {})
@@ -100,5 +101,9 @@ def enrich_verdicts_geo(
         v.isp = isp
 
         country_counts[cc] = country_counts.get(cc, 0) + 1
+        if isp and isp != "-":
+            isp_counts[isp] = isp_counts.get(isp, 0) + 1
 
-    return dict(sorted(country_counts.items(), key=lambda x: x[1], reverse=True))
+    sorted_countries = dict(sorted(country_counts.items(), key=lambda x: x[1], reverse=True))
+    sorted_isps = dict(sorted(isp_counts.items(), key=lambda x: x[1], reverse=True))
+    return sorted_countries, sorted_isps

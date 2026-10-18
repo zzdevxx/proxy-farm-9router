@@ -240,7 +240,9 @@ async def run(args) -> int:
         new_results = []
         alive_new = 0
         if not args.recheck_only and fresh:
-            print(f"\n  [5] UJI {human(len(fresh))} kandidat baru (tcp dulu, "
+            target_alive = farm_cfg.get("target_fresh_alive", 0)
+            target_str = f" (target: {target_alive})" if target_alive > 0 else ""
+            print(f"\n  [5] UJI {human(len(fresh))} kandidat baru{target_str} (tcp dulu, "
                   f"exit-IP utk {min(len(fresh), deep_n)} tercepat)")
 
             async def probe_fresh(c):
@@ -253,24 +255,38 @@ async def run(args) -> int:
 
             done = 0
             total = len(fresh)
-            for fut in asyncio.as_completed([probe_fresh(c) for c in fresh]):
-                cand, verdict = await fut
+            tasks = [asyncio.create_task(probe_fresh(c)) for c in fresh]
+            for fut in asyncio.as_completed(tasks):
+                try:
+                    cand, verdict = await fut
+                except asyncio.CancelledError:
+                    continue
                 new_results.append((cand, verdict))
                 if verdict.alive:
                     alive_new += 1
                 done += 1
                 if done % 250 == 0 or done == total:
                     progress(done, total, f"hidup={alive_new}")
-            print(f"  [5b] kandidat baru: {alive_new} hidup / {total - alive_new} mati")
+                if target_alive > 0 and alive_new >= target_alive:
+                    progress(done, total, f"hidup={alive_new}")
+                    print(f"\n  [5-Exit] 🎯 Target {target_alive} proxy hidup baru tercapai pada pengujian ke-{done:,}!")
+                    for t in tasks:
+                        if not t.done():
+                            t.cancel()
+                    break
+            print(f"  [5b] kandidat baru: {alive_new} hidup / {done - alive_new} mati (dari {done:,} diuji)")
 
             # ── 5c) enrich GeoIP / negara untuk proxy yang hidup ────────────
             alive_fresh = [(c, v) for c, v in new_results if v.alive]
             if alive_fresh:
                 print(f"  [5c] deteksi negara untuk {len(alive_fresh)} proxy hidup (batch GeoIP)...")
-                geo_stats = geomod.enrich_verdicts_geo(new_results, timeout=6.0)
+                geo_stats, isp_stats = geomod.enrich_verdicts_geo(new_results, timeout=6.0)
                 if geo_stats:
                     top_cc = ", ".join(f"{cc}={cnt}" for cc, cnt in list(geo_stats.items())[:8])
-                    print(f"       Negara: {top_cc}")
+                    print(f"       Negara : {top_cc}")
+                if isp_stats:
+                    top_isp = ", ".join(f"{isp[:20]}={cnt}" for isp, cnt in list(isp_stats.items())[:5])
+                    print(f"       Top ISP: {top_isp}")
         elif args.recheck_only:
             print("\n  [5] --recheck-only: lewati pengujian kandidat baru")
 

@@ -19,7 +19,7 @@ echo "  ╚═══════════════════════
 echo "${C_RST}"
 echo "  🚀 Menjalankan Auto-Farm Penuh..."
 echo "     • Recheck & pangkas proxy mati dari DB 9Router (strike >= 2)"
-echo "     • Tarik proxy fresh dari 44 sumber global (termasuk pre-checked)"
+echo "     • Tarik proxy fresh dari 62 sumber global (termasuk pre-checked)"
 echo "     • Uji tunnel HTTPS CONNECT nyata (TLS handshake & anti-leak)"
 echo "     • Deteksi negara batch GeoIP ([ID], [SG], [US], [VN], dll)"
 echo "     • Suntikkan ratusan proxy fresh ke DB & rapikan urutan"

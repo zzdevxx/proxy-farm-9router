@@ -413,6 +413,70 @@
       "protocol": "socks5",
       "enabled": true,
       "note": "Live SOCKS5 proxies from TuanMinPay"
+    },
+    {
+      "id": "proxyspace-http",
+      "parser": "text_ipport",
+      "url": "https://proxyspace.pro/http.txt",
+      "protocol": "http",
+      "enabled": true,
+      "note": "4k+ HTTP proxies from proxyspace.pro"
+    },
+    {
+      "id": "proxyspace-socks5",
+      "parser": "text_ipport",
+      "url": "https://proxyspace.pro/socks5.txt",
+      "protocol": "socks5",
+      "enabled": true,
+      "note": "5k+ SOCKS5 proxies from proxyspace.pro"
+    },
+    {
+      "id": "zaeem20-http",
+      "parser": "text_ipport",
+      "url": "https://raw.githubusercontent.com/Zaeem20/FREE_PROXIES_LIST/master/http.txt",
+      "protocol": "http",
+      "enabled": true,
+      "note": "Free proxy list updated every 10 minutes"
+    },
+    {
+      "id": "zaeem20-https",
+      "parser": "text_ipport",
+      "url": "https://raw.githubusercontent.com/Zaeem20/FREE_PROXIES_LIST/master/https.txt",
+      "protocol": "https",
+      "enabled": true,
+      "note": "Free HTTPS proxy list updated every 10 minutes"
+    },
+    {
+      "id": "zaeem20-socks5",
+      "parser": "text_ipport",
+      "url": "https://raw.githubusercontent.com/Zaeem20/FREE_PROXIES_LIST/master/socks5.txt",
+      "protocol": "socks5",
+      "enabled": true,
+      "note": "Free SOCKS5 proxy list updated every 10 minutes"
+    },
+    {
+      "id": "mmpx12-http",
+      "parser": "text_ipport",
+      "url": "https://raw.githubusercontent.com/mmpx12/proxy-list/master/http.txt",
+      "protocol": "http",
+      "enabled": true,
+      "note": "Hourly updated HTTP proxy list"
+    },
+    {
+      "id": "mmpx12-https",
+      "parser": "text_ipport",
+      "url": "https://raw.githubusercontent.com/mmpx12/proxy-list/master/https.txt",
+      "protocol": "https",
+      "enabled": true,
+      "note": "Hourly updated HTTPS proxy list"
+    },
+    {
+      "id": "mmpx12-socks5",
+      "parser": "text_ipport",
+      "url": "https://raw.githubusercontent.com/mmpx12/proxy-list/master/socks5.txt",
+      "protocol": "socks5",
+      "enabled": true,
+      "note": "Hourly updated SOCKS5 proxy list"
     }
   ]
 }

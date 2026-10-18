@@ -104,13 +104,17 @@ async def live_probe(
             r = await _get_via_proxy(proxy_url, ep, timeout)
         except asyncio.TimeoutError:
             last_err = "timeout"
-            continue
+            # Timeout pada handshake/tunnel = proxy tidak responsif, hentikan uji
+            # tanpa membuang waktu mencoba endpoint kedua.
+            break
         except Exception as exc:
             last_err = f"{type(exc).__name__}"
-            continue
+            # Masalah koneksi/TLS pada proxy itu sendiri, hentikan uji.
+            break
 
         if r.status_code != 200:
             last_err = f"status:{r.status_code}"
+            # Status error pada endpoint target (misal rate limit 429), boleh coba endpoint cadangan.
             continue
 
         body = (r.text or "").strip()

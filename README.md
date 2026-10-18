@@ -3,8 +3,8 @@
 <p align="center">
   <img src="https://img.shields.io/badge/Python-3.11%20%7C%203.12-blue?style=for-the-badge&logo=python&logoColor=white" alt="Python Version" />
   <img src="https://img.shields.io/badge/License-MIT-green?style=for-the-badge" alt="MIT License" />
-  <img src="https://img.shields.io/badge/Feeds-54%20Sources-purple?style=for-the-badge&logo=github" alt="54 Sources" />
-  <img src="https://img.shields.io/badge/Candidate%20Pool-700k%2B-orange?style=for-the-badge" alt="700k+ Candidates" />
+  <img src="https://img.shields.io/badge/Feeds-62%20Sources-purple?style=for-the-badge&logo=github" alt="62 Sources" />
+  <img src="https://img.shields.io/badge/Candidate%20Pool-750k%2B-orange?style=for-the-badge" alt="750k+ Candidates" />
   <img src="https://img.shields.io/badge/Protocols-HTTP%20%7C%20HTTPS%20%7C%20SOCKS5-blueviolet?style=for-the-badge" alt="Protocols" />
   <img src="https://img.shields.io/badge/Integration-9Router%20Compatible-red?style=for-the-badge" alt="9Router Compatible" />
 </p>
@@ -26,13 +26,16 @@ Kebanyakan proxy scraper publik memasukkan ribuan proxy mati atau proxy palsu ya
 ## 🚀 Fitur Utama
 
 - 🖱️ **Murni 1-Klik di Desktop:** Cukup klik ganda shortcut di Desktop. Program langsung otomatis bekerja detik itu juga, menampilkan progres rapi, dan menutup otomatis setelah selesai.
-- 🌐 **Koleksi 54 Sumber Global (Termasuk Pre-Checked Feeds):** Mengambil lebih dari **700.000 kandidat** (360.000+ IP unik) dari repositori terkurasi (dinoz0rg, xyzs996, proxyspace, monosans, geonode, databay, hproxy, dpangestuw, hookzof, murongpig, zevtyardt, b4rc0de, roosterkid, dll).
+- 🌐 **Koleksi 62 Sumber Global (Termasuk Pre-Checked Feeds):** Mengambil lebih dari **750.000 kandidat** (350.000+ IP unik) dari repositori terkurasi (dinoz0rg, xyzs996, proxyspace, monosans, geonode, databay, hproxy, dpangestuw, zaeem20, mmpx12, hookzof, murongpig, zevtyardt, b4rc0de, roosterkid, dll).
 - 🏷️ **Batch GeoIP & Pelabelan Negara Otomatis:** Otomatis mendeteksi dan memberi label kode negara (`[ID]`, `[SG]`, `[US]`, `[VN]`, `[PH]`) pada nama proxy yang masuk ke 9Router via batch endpoint 100 IP/request.
 - ⚡ **Sorting Latensi Tercepat (Fastest on Top):** Proxy aktif diurutkan berdasarkan ping/latensi terendah (ms terkecil di paling atas) agar respon AI di 9Router selalu ngebut.
+- 🎯 **Smart Early-Exit:** Otomatis berhenti begitu target proxy hidup tercapai (misal 800 IP), memangkas waktu eksekusi hingga 50%.
+- 🛡️ **Single-Shot Failover & Sanitasi IP Privat:** Membuang IP lokal/privat (127.0.0.1, 10.x, 192.168.x) di awal dan langsung memutus kandidat yang timeout tanpa buang waktu mencoba endpoint cadangan.
 - ⚖️ **Fair Round-Robin Sampling:** Sumber masif (100k+) tidak memonopoli slot kandidat; setiap repo mendapat jatah sampling berimbang.
 - 🔒 **Verifikasi HTTPS CONNECT Nyata:** Memvalidasi handshake TLS sungguhan dan memverifikasi respon IP menggunakan parser `ipaddress` murni—menolak 100% halaman CAPTCHA dan error HTML Cloudflare.
 - 🛡️ **Triple-Layer Relay Guard:** Relay Vercel dan Cloudflare Worker bawaan Anda (`*.unnesdev.workers.dev`) **100% READ-ONLY** dan terlindungi di 3 lapis sistem (*scope allowlist* ➔ *db query filter* ➔ *pre-commit assertion*).
 - 🧹 **Two-Strike Grace Reaper:** Proxy yang mati diberi kesempatan 2 kali uji berturut-turut sebelum dihapus agar tidak terbuang hanya karena timeout sesaat.
+- 📊 **Sorting Rapi:** Menjaga urutan tampilan dashboard 9Router tetap teratur: `Custom HTTP/SOCKS5` (teratas) ➔ `Vercel` ➔ `Cloudflare`.
 - 📊 **Sorting Rapi:** Menjaga urutan tampilan dashboard 9Router tetap teratur: `Custom HTTP/SOCKS5` (teratas) ➔ `Vercel` ➔ `Cloudflare`.
 
 ---

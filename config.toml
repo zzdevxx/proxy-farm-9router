@@ -25,6 +25,12 @@ deep_test_timeout = 5.0
 # 2 = gagal 2x berturut-turut baru dibuang dari DB.
 grace_strikes = 2
 
+# Target proxy hidup baru per putaran:
+# Begitu jumlah proxy baru yang terbukti hidup mencapai target ini,
+# pengujian kandidat berikutnya langsung diselesaikan (early-exit hemat waktu).
+# 0 = uji semua kandidat tanpa batas.
+target_fresh_alive = 800
+
 [test]
 mode = "deep"
 

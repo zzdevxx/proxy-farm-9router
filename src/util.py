@@ -30,7 +30,15 @@ def parse_endpoint(token):
         return None
     if _IPV4.match(host):
         try:
-            ipaddress.IPv4Address(host)
+            ip_obj = ipaddress.IPv4Address(host)
+            if (
+                ip_obj.is_private
+                or ip_obj.is_loopback
+                or ip_obj.is_reserved
+                or ip_obj.is_multicast
+                or ip_obj.is_link_local
+            ):
+                return None
         except ValueError:
             return None
         return host, port
