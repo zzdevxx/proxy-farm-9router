@@ -189,6 +189,94 @@
       "url": "https://raw.githubusercontent.com/clarketm/proxy-list/master/proxy-list-raw.txt",
       "enabled": true,
       "note": "Forward proxies updated daily"
+    },
+    {
+      "id": "b4rc0de-http",
+      "parser": "text_ipport",
+      "url": "https://raw.githubusercontent.com/B4RC0DE-TM/proxy-list/main/HTTP.txt",
+      "protocol": "http",
+      "enabled": true,
+      "note": "3k+ active HTTP proxies (from PetaniProxy)"
+    },
+    {
+      "id": "b4rc0de-socks5",
+      "parser": "text_ipport",
+      "url": "https://raw.githubusercontent.com/B4RC0DE-TM/proxy-list/main/SOCKS5.txt",
+      "protocol": "socks5",
+      "enabled": true,
+      "note": "SOCKS5 proxies (from PetaniProxy)"
+    },
+    {
+      "id": "sunny9577-all",
+      "parser": "text_ipport",
+      "url": "https://raw.githubusercontent.com/sunny9577/proxy-scraper/master/proxies.txt",
+      "protocol": "http",
+      "enabled": true,
+      "note": "1.7k+ mixed proxies (from PetaniProxy)"
+    },
+    {
+      "id": "hendrikbgr-http",
+      "parser": "text_ipport",
+      "url": "https://raw.githubusercontent.com/hendrikbgr/Free-Proxy-Repo/master/proxy_list.txt",
+      "protocol": "http",
+      "enabled": true,
+      "note": "Free-Proxy-Repo daily feed (from PetaniProxy)"
+    },
+    {
+      "id": "monosans-http-raw",
+      "parser": "text_ipport",
+      "url": "https://raw.githubusercontent.com/monosans/proxy-list/main/proxies/http.txt",
+      "protocol": "http",
+      "enabled": true,
+      "note": "Monosans raw HTTP feed (from PetaniProxy)"
+    },
+    {
+      "id": "monosans-socks5-raw",
+      "parser": "text_ipport",
+      "url": "https://raw.githubusercontent.com/monosans/proxy-list/main/proxies/socks5.txt",
+      "protocol": "socks5",
+      "enabled": true,
+      "note": "Monosans raw SOCKS5 feed (from PetaniProxy)"
+    },
+    {
+      "id": "almroot-http",
+      "parser": "text_ipport",
+      "url": "https://raw.githubusercontent.com/almroot/proxylist/master/list.txt",
+      "protocol": "http",
+      "enabled": true,
+      "note": "almroot proxy list (from PetaniProxy)"
+    },
+    {
+      "id": "shiftytr-http",
+      "parser": "text_ipport",
+      "url": "https://raw.githubusercontent.com/ShiftyTR/Proxy-List/master/http.txt",
+      "protocol": "http",
+      "enabled": true,
+      "note": "ShiftyTR HTTP feed (from PetaniProxy)"
+    },
+    {
+      "id": "shiftytr-https",
+      "parser": "text_ipport",
+      "url": "https://raw.githubusercontent.com/ShiftyTR/Proxy-List/master/https.txt",
+      "protocol": "https",
+      "enabled": true,
+      "note": "ShiftyTR HTTPS feed (from PetaniProxy)"
+    },
+    {
+      "id": "proxyscrape-v2-http",
+      "parser": "text_ipport",
+      "url": "https://api.proxyscrape.com/v2/?request=displayproxies&protocol=http&timeout=5000&country=all&ssl=all&anonymity=all",
+      "protocol": "http",
+      "enabled": true,
+      "note": "ProxyScrape v2 displayproxies HTTP (from PetaniProxy)"
+    },
+    {
+      "id": "proxyscrape-v2-socks5",
+      "parser": "text_ipport",
+      "url": "https://api.proxyscrape.com/v2/?request=displayproxies&protocol=socks5&timeout=5000&country=all",
+      "protocol": "socks5",
+      "enabled": true,
+      "note": "ProxyScrape v2 displayproxies SOCKS5 (from PetaniProxy)"
     }
   ]
 }

@@ -3,8 +3,8 @@
 <p align="center">
   <img src="https://img.shields.io/badge/Python-3.11%20%7C%203.12-blue?style=for-the-badge&logo=python&logoColor=white" alt="Python Version" />
   <img src="https://img.shields.io/badge/License-MIT-green?style=for-the-badge" alt="MIT License" />
-  <img src="https://img.shields.io/badge/Feeds-26%2B%20Sources-purple?style=for-the-badge&logo=github" alt="26+ Sources" />
-  <img src="https://img.shields.io/badge/Candidate%20Pool-560k%2B-orange?style=for-the-badge" alt="560k+ Candidates" />
+  <img src="https://img.shields.io/badge/Feeds-37%20Sources-purple?style=for-the-badge&logo=github" alt="37 Sources" />
+  <img src="https://img.shields.io/badge/Candidate%20Pool-620k%2B-orange?style=for-the-badge" alt="620k+ Candidates" />
   <img src="https://img.shields.io/badge/Protocols-HTTP%20%7C%20HTTPS%20%7C%20SOCKS5-blueviolet?style=for-the-badge" alt="Protocols" />
   <img src="https://img.shields.io/badge/Integration-9Router%20Compatible-red?style=for-the-badge" alt="9Router Compatible" />
 </p>
@@ -25,11 +25,11 @@ Kebanyakan proxy scraper publik memasukkan ribuan proxy mati atau proxy palsu ya
 
 ## 🚀 Fitur Utama
 
-- 🖱️ **Murni 1-Klik:** Cukup klik ganda shortcut di Desktop. Sinkronisasi berjalan otomatis tanpa pertanyaan interaktif, menampilkan progres rapi, dan menutup otomatis setelah selesai.
-- 🌐 **Koleksi 26+ Sumber Aktif:** Mengambil lebih dari **560.000 kandidat** (318.000+ IP unik) dari repositori terkurasi (monosans, geonode, proxyscrape, proxifly, hookzof, murongpig, zevtyardt, dll).
-- ⚖️ **Fair Round-Robin Sampling:** Sumber masif (100k+) tidak akan memonopoli slot kandidat; setiap repo mendapat jatah sampling berimbang.
+- 🖱️ **Murni 1-Klik di Desktop (Auto-Run 4 Detik):** Cukup klik ganda shortcut di Desktop. Program langsung otomatis mulai dalam 4 detik (atau tekan `2` untuk quick recheck). Menampilkan progres rapi dan menutup otomatis setelah selesai.
+- 🌐 **Koleksi 37 Sumber Global:** Mengambil lebih dari **620.000 kandidat** (338.000+ IP unik) dari repositori terkurasi (monosans, geonode, proxyscrape v2/v4, proxifly, hookzof, murongpig, zevtyardt, b4rc0de, roosterkid, dll).
+- ⚖️ **Fair Round-Robin Sampling:** Sumber masif (100k+) tidak memonopoli slot kandidat; setiap repo mendapat jatah sampling berimbang.
 - 🔒 **Verifikasi HTTPS CONNECT Nyata:** Memvalidasi handshake TLS sungguhan dan memverifikasi respon IP menggunakan parser `ipaddress` murni—menolak 100% halaman CAPTCHA dan error HTML Cloudflare.
-- 🛡️ **Triple-Layer Relay Guard:** Relay Vercel dan Cloudflare Worker bawaan Anda **100% READ-ONLY** dan terlindungi di 3 lapis sistem (*scope allowlist* ➔ *db query filter* ➔ *pre-commit assertion*).
+- 🛡️ **Triple-Layer Relay Guard:** Relay Vercel dan Cloudflare Worker bawaan Anda (`*.unnesdev.workers.dev`) **100% READ-ONLY** dan terlindungi di 3 lapis sistem (*scope allowlist* ➔ *db query filter* ➔ *pre-commit assertion*).
 - 🧹 **Two-Strike Grace Reaper:** Proxy yang mati diberi kesempatan 2 kali uji berturut-turut sebelum dihapus agar tidak terbuang hanya karena timeout sesaat.
 - 📊 **Sorting Rapi:** Menjaga urutan tampilan dashboard 9Router tetap teratur: `Custom HTTP/SOCKS5` (teratas) ➔ `Vercel` ➔ `Cloudflare`.
 
@@ -44,7 +44,7 @@ Kebanyakan proxy scraper publik memasukkan ribuan proxy mati atau proxy palsu ya
    [0. Auto-Backup]  ─── Salin data.sqlite ke backups/pre-run-* (auto-rotate 10)
           │
           ▼
-   [1. Fetch 26 Feeds] ── Tarik 560k+ kandidat ➔ Round-robin ➔ Dedup ➔ 15k kandidat fresh
+   [1. Fetch 37 Feeds] ── Tarik 620k+ kandidat ➔ Round-robin ➔ Dedup ➔ 15k kandidat fresh
           │
           ▼
    [2. Recheck DB]   ─── Uji proxy custom lama di 9Router dengan HTTPS CONNECT
@@ -91,8 +91,8 @@ Klik ganda ikon **Proxy Farm 9Router** di Desktop Anda!
 # Uji coba tanpa mengubah isi database (Dry Run)
 python3 farm.py --dry-run
 
-# Verifikasi kelayakan sampel proxy aktif ke endpoint AI OpenRouter
-python3 verify_9router.py -n 30 --active-only
+# Quick recheck & pangkas proxy mati dari DB saja
+python3 verify_9router.py
 
 # Rapikan ulang urutan tampilan di dashboard 9Router
 python3 reorder.py

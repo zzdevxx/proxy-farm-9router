@@ -4,4 +4,6 @@ backups/
 reports/*.json
 reports/*.md
 data/*.json
+data/warp/
+*.conf
 .venv/
