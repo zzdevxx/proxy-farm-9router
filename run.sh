@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # proxy-farm-9router — Menu 4 Mode
-# Klik ganda di Desktop: langsung jalan mode 1 tanpa tanya (hitung mundur 10 detik),
-# atau tekan angka 2/3/4 untuk mode lain.
+# Klik ganda di Desktop: menu terbuka dan menunggu pilihanmu. Tidak ada
+# mode yang berjalan atas namamu — bot ini menulis ke DB 9router.
 #
 # ⛔ Relay vercel & cloudflare tidak pernah disentuh mode apa pun.
 
@@ -27,7 +27,7 @@ menu() {
   banner
   echo "  ${C_BLD}Pilih mode:${C_RST}"
   echo
-  echo "   ${C_GRN}1${C_RST}) ${C_BLD}Auto penuh${C_RST} ${C_DIM}(default)${C_RST}"
+  echo "   ${C_GRN}1${C_RST}) ${C_BLD}Auto penuh${C_RST}"
   echo "      Cek proxy 9router → buang yang mati → tarik sumber"
   echo "      → uji → suntik yang hidup → rapikan urutan"
   echo
@@ -51,13 +51,23 @@ menu() {
 }
 
 pilihan=""
-# Klik ganda dari Desktop: otomatis pilih 1 setelah 10 detik tanpa sentuhan.
-if [ -t 0 ]; then
-  read -t 10 -rp "  Pilih [1/2/3/4/q] — otomatis 1 dalam 10 detik: " pilihan || true
-else
-  pilihan="1"
-fi
-pilihan="${pilihan:-1}"
+# Menu menunggu sampai kamu memilih. Tidak ada mode yang berjalan sendiri —
+# menjalankan bot ini menulis ke DB 9router, jadi keputusan tetap di tanganmu.
+while true; do
+  if ! read -rp "  Pilih [1/2/3/4/q]: " pilihan; then
+    # stdin habis (bukan terminal interaktif): jangan menggantung diam-diam
+    echo
+    echo "  Tidak ada masukan, dan menu ini butuh terminal interaktif."
+    echo "  Jalankan langsung: python3 farm.py --action {auto|indonesia|cek|clean}"
+    exit 1
+  fi
+  pilihan="$(printf '%s' "$pilihan" | tr -d '[:space:]')"
+  case "$pilihan" in
+    1|2|3|4|q|Q) break ;;
+    "") echo "  Ketik 1, 2, 3, 4, atau q." ;;
+    *)  echo "  Pilihan tak dikenal: '$pilihan' — ketik 1, 2, 3, 4, atau q." ;;
+  esac
+done
 
 case "$pilihan" in
   1) aksi=auto;      judul="AUTO PENUH" ;;
