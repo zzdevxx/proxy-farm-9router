@@ -77,7 +77,7 @@ def backup_db(db_path: str, backup_dir: str, keep: int) -> str | None:
         p = db_path + ext
         if os.path.exists(p):
             shutil.copy2(p, os.path.join(dest, f"data.sqlite{ext}"))
-    old = sorted(d for d in os.listdir(dest_root) if d.startswith("pre-run-"))
+    old = sorted(d for d in os.listdir(dest_root) if d.startswith(("pre-run-", "pre-farm-")))
     while len(old) > keep:
         shutil.rmtree(os.path.join(dest_root, old.pop(0)), ignore_errors=True)
     return dest
@@ -199,16 +199,22 @@ async def run(args) -> int:
         dead_old = total - alive_old
         print(f"  [3b] recheck: {alive_old} hidup / {dead_old} mati")
 
-        # tulis hasil recheck
-        now = now_iso()
-        con.execute("BEGIN IMMEDIATE")
-        try:
-            for row, verdict in results:
-                dbmod.mark_result(con, row["id"], verdict, is_new_row=False, now=now)
-            con.execute("COMMIT")
-        except Exception:
-            con.execute("ROLLBACK")
-            raise
+        # tulis hasil recheck — TIDAK boleh jalan saat --dry-run, karena
+        # mark_result menaikkan strike & mematikan isActive. Proxy yang kebetulan
+        # lambat saat diuji akan tercopot dari kolam rotasi 9router hanya karena
+        # sebuah uji coba.
+        if args.dry_run:
+            print(f"  [3c] DRY-RUN: {len(results)} hasil recheck tidak ditulis ke DB")
+        else:
+            now = now_iso()
+            con.execute("BEGIN IMMEDIATE")
+            try:
+                for row, verdict in results:
+                    dbmod.mark_result(con, row["id"], verdict, is_new_row=False, now=now)
+                con.execute("COMMIT")
+            except Exception:
+                con.execute("ROLLBACK")
+                raise
 
         # ── 4) PRUNE (yang mati & strike cukup) ──────────────────────────
         prune_stats = {"pruned": [], "skipped_bound": [], "skipped_grace": 0}
@@ -239,23 +245,73 @@ async def run(args) -> int:
         # ── 5) INJECT kandidat baru (uji dulu, baru tulis) ───────────────
         new_results = []
         alive_new = 0
+        skipped_deep = 0
         if not args.recheck_only and fresh:
             target_alive = farm_cfg.get("target_fresh_alive", 0)
             target_str = f" (target: {target_alive})" if target_alive > 0 else ""
-            print(f"\n  [5] UJI {human(len(fresh))} kandidat baru{target_str} (tcp dulu, "
-                  f"exit-IP utk {min(len(fresh), deep_n)} tercepat)")
+            if mode == "tcp":
+                deep_note = "lompati uji exit-IP"
+            elif deep_n <= 0:
+                deep_note = "exit-IP utk semua yang lolos TCP"
+            else:
+                deep_note = f"exit-IP utk {deep_n} tercepat"
+            mode_note = " [mode: tcp]" if mode == "tcp" else ""
+            print(f"\n  [5] UJI {human(len(fresh))} kandidat baru{target_str}{mode_note} "
+                  f"(tcp dulu, lalu {deep_note})")
 
-            async def probe_fresh(c):
+            async def probe_tcp_only(c):
+                """Tahap 1 murah: TCP saja, tanpa mengontak endpoint keluar."""
                 async with sem:
-                    host, port = c.host, c.port
-                    tcp = await testers.tcp_probe(host, port, tcp_to)
-                    if not tcp.alive:
-                        return c, tcp
+                    return c, await testers.tcp_probe(c.host, c.port, tcp_to)
+
+            async def probe_deep(item):
+                """Tahap 2: jalur HTTPS sungguhan, hanya untuk yang lolos TCP."""
+                c, tcp = item
+                if not tcp.alive:
+                    return c, tcp
+                async with sem:
                     return c, await testers.live_probe(c.proxy_url, endpoints, deep_to, lip)
 
             done = 0
             total = len(fresh)
-            tasks = [asyncio.create_task(probe_fresh(c)) for c in fresh]
+            tcp_sorted = []
+            tcp_tasks = [asyncio.create_task(probe_tcp_only(c)) for c in fresh]
+            for fut in asyncio.as_completed(tcp_tasks):
+                try:
+                    item = await fut
+                except asyncio.CancelledError:
+                    continue
+                tcp_sorted.append(item)
+                done += 1
+                if done % 250 == 0 or done == total:
+                    progress(done, total, f"tcp lolos={sum(1 for _, v in tcp_sorted if v.alive)}")
+            survived = [it for it in tcp_sorted if it[1].alive]
+
+            # deep_test_top_n = batas uji mendalam, diambil dari yang TCP-nya tercepat.
+            # 0 / tak diset = uji semua yang lolos TCP.
+            deep_n_eff = len(survived) if deep_n <= 0 else min(deep_n, len(survived))
+
+            if mode == "tcp":
+                # --mode tcp: tahap mendalam dilewati sepenuhnya. Kandidat yang TCP-nya
+                # hidup tetap disuntik, tetapi tanpa bukti tunnel HTTPS & tanpa exit-IP.
+                # Ini pilihan sadar operator untuk run cepat, bukan default.
+                for cand, tcp_v in survived:
+                    new_results.append((cand, tcp_v))
+                    alive_new += 1
+                print(f"  [5a] mode tcp: {len(survived):,} kandidat lolos TCP disuntik "
+                      f"tanpa uji exit-IP (tanpa jaminan tunnel HTTPS)")
+                deep_taken = []
+            else:
+                skipped_deep = len(survived) - deep_n_eff
+                print(f"  [5a] TCP lolos: {len(survived):,} dari {len(fresh):,} kandidat"
+                      + (f" · uji mendalam {deep_n_eff:,} tercepat, dilewati {skipped_deep:,}"
+                         if skipped_deep else " · semuanya diuji mendalam"))
+                ranked = sorted(survived, key=lambda it: it[1].latency_ms or 9_999_999)
+                deep_taken = ranked[:deep_n_eff]
+
+            done = 0
+            total = len(deep_taken)
+            tasks = [asyncio.create_task(probe_deep(it)) for it in deep_taken]
             for fut in asyncio.as_completed(tasks):
                 try:
                     cand, verdict = await fut
@@ -274,7 +330,14 @@ async def run(args) -> int:
                         if not t.done():
                             t.cancel()
                     break
-            print(f"  [5b] kandidat baru: {alive_new} hidup / {done - alive_new} mati (dari {done:,} diuji)")
+            # yang terpangkas oleh batas TIDAK dicatat sebagai "mati" (mereka tidak
+            # pernah diuji) — dilaporkan terpisah supaya tidak ada yang hilang diam-diam.
+            if skipped_deep:
+                print(f"       {skipped_deep:,} kandidat dilewati tahap mendalam "
+                      f"(batas deep_test_top_n={deep_n}) — tidak masuk DB run ini")
+            dead_new = sum(1 for _, v in new_results if not v.alive)
+            print(f"  [5b] kandidat baru: {alive_new} hidup / {dead_new} mati "
+                  f"(dari {len(new_results):,} dinilai)")
 
             # ── 5c) enrich GeoIP / negara untuk proxy yang hidup ────────────
             alive_fresh = [(c, v) for c, v in new_results if v.alive]
@@ -306,7 +369,11 @@ async def run(args) -> int:
             except Exception:
                 con.execute("ROLLBACK")
                 raise
-            print(f"  [6] {inserted} proxy baru masuk ke DB")
+            if skipped_deep:
+                print(f"  [6] {inserted} proxy baru masuk ke DB"
+                      f" ({skipped_deep:,} kandidat terpangkas batas deep_test_top_n)")
+            else:
+                print(f"  [6] {inserted} proxy baru masuk ke DB")
 
         # ── 6) rangkap: vercel/cloudflare tak tersentuh ─────────────────
         after = dbmod.row_view(con)
@@ -346,6 +413,7 @@ async def run(args) -> int:
             "alive_old": alive_old,
             "dead_old": dead_old,
             "new_alive": alive_new,
+            "skipped_deep": skipped_deep,
             "inserted": inserted,
             "pruned": len(prune_stats["pruned"]),
             "held_grace": prune_stats["skipped_grace"],

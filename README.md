@@ -93,6 +93,8 @@ Klik ganda ikon **Proxy Farm 9Router** di Desktop Anda!
 ./run.sh
 
 # Uji coba tanpa mengubah isi database (Dry Run)
+# Proxy diuji dan hasilnya dilaporkan, tetapi TIDAK ditulis ke DB:
+# tidak ada strike, tidak ada perubahan isActive, tidak ada pemangkasan.
 python3 farm.py --dry-run
 
 # Quick recheck & pangkas proxy mati dari DB saja (super cepat ~30 detik)
@@ -100,7 +102,17 @@ python3 farm.py --recheck-only
 
 # Rapikan ulang urutan tampilan di dashboard 9Router (tercepat di atas)
 python3 reorder.py
+
+# Uji kelayakan satu per satu: TCP -> HTTPS tunnel -> jangkauan API provider AI
+# Ini uji paling ketat di repo: memastikan proxy benar-benar bisa menembus
+# openrouter.ai/api/v1/models, bukan sekadar keluar ke internet.
+python3 verify_9router.py -n 50 --active-only
 ```
+
+> **Catatan mode uji.** `--dry-run` tidak menulis apa pun ke DB. `--mode tcp` melewati
+> tahap uji exit-IP sepenuhnya: kandidat yang lolos TCP langsung disuntik tanpa bukti
+> tunnel HTTPS, jadi pakai hanya untuk run cepat. `deep_test_top_n` di `config.toml`
+> membatasi berapa kandidat tercepat yang masuk uji mendalam; set `0` untuk menguji semua.
 
 ---
 

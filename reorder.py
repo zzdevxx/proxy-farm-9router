@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Susun ulang tampilan proxy di 9router tanpa farm apa pun.
 
-Dipakai dari menu run.sh (pilihan 3) untuk memastikan blok urutannya tetap
+Dijalankan manual dari terminal untuk memastikan blok urutannya tetap
 custom -> vercel -> cloudflare tanpa perlu menjalankan proses panjang.
 """
 

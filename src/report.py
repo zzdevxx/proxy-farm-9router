@@ -34,7 +34,9 @@ def write_reports(outdir: str, payload: dict, stamp: str) -> tuple[str, str]:
         f"(baru: {_human(s.get('fresh', 0))})",
         f"- Recheck baris lama     : **{_human(s.get('rechecked', 0))}** "
         f"→ hidup **{_human(s.get('alive_old', 0))}**, mati **{_human(s.get('dead_old', 0))}**",
-        f"- Kandidat baru hidup     : **{_human(s.get('new_alive', 0))}**",
+        f"- Kandidat baru hidup     : **{_human(s.get('new_alive', 0))}**"
+        + (f" (dilewati batas deep_test_top_n: {_human(s.get('skipped_deep', 0))})"
+           if s.get("skipped_deep") else ""),
         f"- Masuk ke DB            : **{_human(s.get('inserted', 0))}**",
         f"- Dipangkas (mati)       : **{_human(s.get('pruned', 0))}** "
         f"(ditahan tenggat: {_human(s.get('held_grace', 0))})",

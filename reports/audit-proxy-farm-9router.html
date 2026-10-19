@@ -1,0 +1,664 @@
+<title>Audit Proxy Farm 9Router</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Public+Sans:wght@400;500;600;700&display=swap">
+
+<style>
+/* ─────────────────────────────────────────────────────────────
+   Rencana desain — "lembar temuan jaringan"
+   Warna : slate sejuk (bukan abu netral) + amber untuk peringatan,
+           merah bata untuk kritis, hijau lumut untuk yang aman.
+   Type  : Public Sans (teks) + JetBrains Mono (kode, angka, alamat).
+   Layout: satu kolom, lebar 68ch; temuan sebagai kartu bernomor
+           dengan garis tingkat keparahan di tepi kiri.
+   ───────────────────────────────────────────────────────────── */
+:root {
+  --bg: #f7f8fa;
+  --surface: #ffffff;
+  --surface-2: #eef0f4;
+  --fg: #16181d;
+  --fg-muted: #5b6270;
+  --fg-faint: #878e9c;
+  --line: #d8dce3;
+  --line-strong: #b9c0cb;
+  --accent: #1b4b73;
+  --crit: #a3231c;
+  --crit-bg: #fbeceb;
+  --warn: #8a5200;
+  --warn-bg: #fdf3e2;
+  --ok: #2f5d34;
+  --ok-bg: #ecf4ec;
+  --code-bg: #eceff4;
+  --font-body: "Public Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #12141a;
+    --surface: #1a1d25;
+    --surface-2: #22262f;
+    --fg: #e6e9ef;
+    --fg-muted: #a2aab8;
+    --fg-faint: #7b8494;
+    --line: #2c313c;
+    --line-strong: #3d4450;
+    --accent: #7fb4dd;
+    --crit: #f09189;
+    --crit-bg: #2e1b1a;
+    --warn: #e0aa5e;
+    --warn-bg: #2c2418;
+    --ok: #8ec292;
+    --ok-bg: #1b261c;
+    --code-bg: #23272f;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #12141a;
+  --surface: #1a1d25;
+  --surface-2: #22262f;
+  --fg: #e6e9ef;
+  --fg-muted: #a2aab8;
+  --fg-faint: #7b8494;
+  --line: #2c313c;
+  --line-strong: #3d4450;
+  --accent: #7fb4dd;
+  --crit: #f09189;
+  --crit-bg: #2e1b1a;
+  --warn: #e0aa5e;
+  --warn-bg: #2c2418;
+  --ok: #8ec292;
+  --ok-bg: #1b261c;
+  --code-bg: #23272f;
+  color-scheme: dark;
+}
+
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-body);
+  font-size: 16px;
+  line-height: 1.62;
+  -webkit-font-smoothing: antialiased;
+}
+
+.wrap {
+  max-width: 76ch;
+  margin-inline: auto;
+  padding-block: 3.5rem 5rem;
+  padding-inline: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 2.75rem;
+}
+
+/* ── Kepala ─────────────────────────────────────────────── */
+.masthead { display: flex; flex-direction: column; gap: 1rem; }
+.eyebrow {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--fg-faint);
+}
+h1 {
+  font-size: clamp(1.9rem, 5vw, 2.6rem);
+  line-height: 1.1;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+  margin: 0;
+}
+.lede { color: var(--fg-muted); max-width: 62ch; margin: 0; font-size: 1.05rem; }
+.meta-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  font-family: var(--font-mono);
+  font-size: 0.76rem;
+}
+.chip {
+  border: 1px solid var(--line);
+  background: var(--surface);
+  border-radius: 3px;
+  padding: 0.25rem 0.55rem;
+  color: var(--fg-muted);
+}
+.chip b { color: var(--fg); font-weight: 500; }
+
+/* ── Judul bagian ───────────────────────────────────────── */
+h2 {
+  font-size: 0.76rem;
+  font-family: var(--font-mono);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--fg-faint);
+  font-weight: 500;
+  margin: 0 0 1.1rem;
+  padding-bottom: 0.6rem;
+  border-bottom: 1px solid var(--line);
+}
+section { display: flex; flex-direction: column; }
+
+/* ── Papan angka ───────────────────────────────────────── */
+.scoreboard {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 1px;
+  background: var(--line);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.tile {
+  background: var(--surface);
+  padding: 1.05rem 1.1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+.tile .label {
+  font-size: 0.7rem;
+  font-family: var(--font-mono);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--fg-faint);
+}
+.tile .value {
+  font-family: var(--font-mono);
+  font-size: 1.6rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+}
+.tile .note { font-size: 0.78rem; color: var(--fg-muted); }
+.tile.is-bad .value { color: var(--crit); }
+.tile.is-warn .value { color: var(--warn); }
+.tile.is-ok .value { color: var(--ok); }
+
+/* ── Temuan ─────────────────────────────────────────────── */
+.findings { display: flex; flex-direction: column; gap: 1.15rem; }
+.finding {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--line-strong);
+  border-radius: 4px;
+  padding: 1.15rem 1.25rem 1.2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+}
+.finding[data-sev="kritis"] { border-left-color: var(--crit); }
+.finding[data-sev="tinggi"] { border-left-color: var(--warn); }
+.finding[data-sev="sedang"] { border-left-color: var(--accent); }
+
+.f-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.6rem; }
+.f-num {
+  font-family: var(--font-mono);
+  font-size: 0.76rem;
+  font-weight: 700;
+  color: var(--fg-faint);
+  font-variant-numeric: tabular-nums;
+}
+.f-title { font-size: 1.06rem; font-weight: 600; letter-spacing: -0.01em; flex: 1 1 20ch; margin: 0; }
+.sev {
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 0.2rem 0.5rem;
+  border-radius: 3px;
+  white-space: nowrap;
+}
+.sev[data-s="kritis"] { background: var(--crit-bg); color: var(--crit); }
+.sev[data-s="tinggi"] { background: var(--warn-bg); color: var(--warn); }
+.sev[data-s="sedang"] { background: var(--surface-2); color: var(--accent); }
+
+.where {
+  font-family: var(--font-mono);
+  font-size: 0.76rem;
+  color: var(--fg-muted);
+  word-break: break-all;
+}
+.finding p { margin: 0; }
+.finding .konsekuensi {
+  border-top: 1px dashed var(--line);
+  padding-top: 0.7rem;
+  color: var(--fg-muted);
+  font-size: 0.93rem;
+}
+.finding .konsekuensi b { color: var(--fg); font-weight: 600; }
+
+pre {
+  background: var(--code-bg);
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  padding: 0.75rem 0.9rem;
+  overflow-x: auto;
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  line-height: 1.55;
+  margin: 0;
+}
+code { font-family: var(--font-mono); font-size: 0.87em; }
+p code, li code, td code {
+  background: var(--code-bg);
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  padding: 0.06em 0.32em;
+}
+
+/* ── Tabel ──────────────────────────────────────────────── */
+.tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 4px; }
+table { border-collapse: collapse; width: 100%; font-size: 0.87rem; }
+th, td { text-align: left; padding: 0.6rem 0.8rem; border-bottom: 1px solid var(--line); }
+th {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--fg-faint);
+  font-weight: 500;
+  background: var(--surface-2);
+  white-space: nowrap;
+}
+tbody tr:last-child td { border-bottom: 0; }
+td.num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+td.mono { font-family: var(--font-mono); font-size: 0.8rem; word-break: break-all; }
+
+/* ── Daftar biasa ───────────────────────────────────────── */
+ul.plain { margin: 0; padding-left: 1.15rem; display: flex; flex-direction: column; gap: 0.45rem; }
+ul.plain li { color: var(--fg-muted); }
+ul.plain li b { color: var(--fg); font-weight: 600; }
+
+/* ── Catatan aman ───────────────────────────────────────── */
+.assurance {
+  background: var(--ok-bg);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--ok);
+  border-radius: 4px;
+  padding: 1.05rem 1.2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+.assurance h3 { margin: 0; font-size: 0.95rem; font-weight: 600; color: var(--ok); }
+.assurance ul { margin: 0; padding-left: 1.15rem; display: flex; flex-direction: column; gap: 0.4rem; }
+.assurance li { color: var(--fg-muted); font-size: 0.92rem; }
+
+/* ── Footer ─────────────────────────────────────────────── */
+footer {
+  border-top: 1px solid var(--line);
+  padding-top: 1.2rem;
+  color: var(--fg-faint);
+  font-size: 0.82rem;
+  font-family: var(--font-mono);
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+a { color: var(--accent); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 2px; }
+@media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+</style>
+
+<div class="wrap">
+
+  <header class="masthead">
+    <div class="eyebrow">Audit kode · 19 Okt 2026</div>
+    <h1>Proxy Farm 9Router</h1>
+    <p class="lede">
+      Sepuluh cacat nyata pada bot pemanen proxy: satu di antaranya membuat mode uji aman
+      menulis ke database gateway AI yang sedang berjalan. Semuanya sudah terbukti dengan
+      menjalankan kodenya, bukan dengan membaca sekilas.
+    </p>
+
+    <div class="assurance" style="margin-top:.35rem">
+      <h3>Status: sudah diperbaiki (19 Okt 2026)</h3>
+      <ul>
+        <li><b>01, 03, 04, 05, 06 sudah dibereskan.</b> <code>--dry-run</code> kini tidak menyentuh DB
+            (dibuktikan: hash DB identik sebelum/sesudah), <code>deep_test_top_n</code> dan
+            <code>--mode</code> kini berperilaku nyata, <code>clarketm</code> sudah berprotokol,
+            <code>injected.py</code> dihapus, rotasi cadangan mencakup <code>pre-farm-*</code>.</li>
+        <li><b>07 dan 08 DIBATALKAN setelah diverifikasi.</b> ip-api.com menolak HTTPS di tier gratis
+            (HTTP 403), jadi memaksakan HTTPS akan mematikan GeoIP. 9router sendiri mematikan
+            validasi TLS (<code>rejectUnauthorized:false</code>) dan punya retry "insecure TLS",
+            jadi <code>verify=False</code> di farm justru selaras dengan runtime.</li>
+        <li><b>02 belum dikerjakan</b> — <code>verify_9router.py</code> sekarang didokumentasikan di
+            README, tetapi belum dijadikan gerbang mutu otomatis.</li>
+      </ul>
+    </div>
+    <div class="meta-row">
+      <span class="chip">HEAD <b>5f70b34</b></span>
+      <span class="chip">Python <b>1.709 LOC</b></span>
+      <span class="chip">62 sumber</span>
+      <span class="chip">DB <b>1.892 baris</b></span>
+      <span class="chip">Mirror: GitLab &amp; Codeberg ✓</span>
+    </div>
+  </header>
+
+  <section>
+    <h2>Keadaan sistem saat diaudit</h2>
+    <div class="scoreboard">
+      <div class="tile is-ok">
+        <span class="label">Integritas DB</span>
+        <span class="value">ok</span>
+        <span class="note">PRAGMA integrity_check</span>
+      </div>
+      <div class="tile">
+        <span class="label">proxyPools</span>
+        <span class="value">1.892</span>
+        <span class="note">1.792 http · 50 vercel · 50 cloudflare</span>
+      </div>
+      <div class="tile">
+        <span class="label">http aktif</span>
+        <span class="value">1.023</span>
+        <span class="note">576 socks5 · 447 http</span>
+      </div>
+      <div class="tile is-ok">
+        <span class="label">Vercel / Cloudflare</span>
+        <span class="value">100%</span>
+        <span class="note">tak tersentuh (rangkap 3 lapis terbukti)</span>
+      </div>
+    </div>
+    <p style="margin:.9rem 0 0;color:var(--fg-muted);font-size:.92rem">
+      Gateway 9router hidup sebagai proses <code>next-server</code> pada port 20128
+      (<code>{"ok":true}</code>) dan memakai DB yang sama, jadi setiap cacat tulis di bawah
+      berdampak pada trafik AI yang sedang berjalan, bukan pada salinan latihan.
+    </p>
+  </section>
+
+  <section>
+    <h2>Temuan</h2>
+    <div class="findings">
+
+      <article class="finding" data-sev="kritis">
+        <div class="f-head">
+          <span class="f-num">01</span>
+          <h3 class="f-title"><code>--dry-run</code> tetap menulis ke database</h3>
+          <span class="sev" data-s="kritis">kritis</span>
+        <span class="sev" style="background:transparent;border:1px solid #2f5d34;color:#2f5d34">✅ diperbaiki</span></div>
+        <div class="where">farm.py:204–211 · dibandingkan dengan gerbang di baris 221, 293, 321</div>
+        <p>
+          Hasil recheck ditulis lewat <code>dbmod.mark_result()</code> di baris 207, di luar
+          cabang <code>args.dry_run</code>. Cabang itu baru muncul belakangan, jadi langkah 3
+          selalu menulis. Semua langkah lain (prune, inject, order) memang dijaga.
+        </p>
+        <pre>selesai  : DRY-RUN, DB tak diubah
+nyatanya : strikes total 4.901 → 6.269   (+1.368)
+           baris strikes == 1 : 479 → 792
+           isActive = 1       : 1.023 → 409</pre>
+        <p class="konsekuensi">
+          <b>Akibatnya:</b> satu kali uji aman mencopot 614 proxy dari kolam rotasi dan
+          memberi strike pada semua baris. Karena 9router memilih proxy dengan
+          <code>isActive:!0</code> saja (tanpa melihat <code>testStatus</code>), proxy sehat
+          yang kebetulan lambat saat diuji langsung hilang dari peredaran. Bagi operator,
+          kerugiannya tidak terlihat: log justru berbohong.
+        </p>
+      </article>
+
+      <article class="finding" data-sev="tinggi">
+        <div class="f-head">
+          <span class="f-num">02</span>
+          <h3 class="f-title">Uji lebih ketat dari produksi, lalu hasilnya dibuang</h3>
+          <span class="sev" data-s="tinggi">tinggi</span>
+        <span class="sev" style="background:transparent;border:1px solid #8a5200;color:#8a5200">⏳ sebagian</span></div>
+        <div class="where">src/testers.py:83–146 · verify_9router.py:100–115</div>
+        <p>
+          <code>verify_9router.py</code> menguji hal yang paling menentukan: apakah proxy
+          benar-benar bisa mencapai API provider AI (<code>openrouter.ai/api/v1/models</code>),
+          bukan sekadar keluar ke internet. <code>farm.py</code> tidak melakukan uji itu.
+        </p>
+        <pre>verify_9router.py : TCP → HTTPS CONNECT → AI provider   ← lebih ketat
+farm.py           : TCP → HTTPS CONNECT (ipify) saja</pre>
+        <p class="konsekuensi">
+          <b>Akibatnya:</b> proxy yang lolos tapi diblokir oleh provider AI ikut masuk DB dan
+          baru ketahuan gagal saat request AI sungguhan berjalan. Lebih lanjut, skrip yang
+          lebih baik ini <b>tidak disebut sama sekali</b> di README maupun di
+          <code>run.sh</code>: ia duduk di root repo tanpa satu pun dokumentasi, jadi
+          kemungkinan besar tidak pernah dipakai.
+        </p>
+      </article>
+
+      <article class="finding" data-sev="tinggi">
+        <div class="f-head">
+          <span class="f-num">03</span>
+          <h3 class="f-title">Dua pengaturan penting hanya jadi label</h3>
+          <span class="sev" data-s="tinggi">tinggi</span>
+        <span class="sev" style="background:transparent;border:1px solid #2f5d34;color:#2f5d34">✅ diperbaiki</span></div>
+        <div class="where">farm.py:111 &amp; 418 (<code>--mode</code>) · farm.py:174 &amp; 246 (<code>deep_test_top_n</code>)</div>
+        <p>
+          <code>--mode tcp</code> hanya mengubah kalimat yang dicetak dan isi laporan. Tidak
+          ada percabangan apa pun: <code>deep</code> maupun <code>tcp</code> menjalankan
+          urutan yang sama persis. <code>deep_test_top_n</code> juga tidak membatasi apa
+          pun; ia muncul satu kali di seluruh kode, di dalam f-string.
+        </p>
+        <pre>mode = args.mode or cfg["test"]["mode"]   # dibaca
+print(f"... mode: {mode}")                # dicetak saja
+                                          # → tak ada cabang lain di seluruh berkas
+
+deep_n = farm_cfg.get("deep_test_top_n", 800)
+print(f"exit-IP utk {min(len(fresh), deep_n)} tercepat")  # → angka karangan</pre>
+        <p class="konsekuensi">
+          <b>Akibatnya:</b> log menjanjikan pengujian cepat lewat <code>--mode tcp</code> dan
+          menjanjikan uji mendalam hanya untuk N tercepat, padahal keduanya tidak terjadi.
+          Operator yang mempercayai log akan salah menilai berapa lama dan seberapa dalam
+          proses berjalan.
+        </p>
+      </article>
+
+      <article class="finding" data-sev="sedang">
+        <div class="f-head">
+          <span class="f-num">04</span>
+          <h3 class="f-title">Tiga sumber tidak punya protokol, satu menghasilkan URL rusak</h3>
+          <span class="sev" data-s="sedang">sedang</span>
+        <span class="sev" style="background:transparent;border:1px solid #2f5d34;color:#2f5d34">✅ diperbaiki</span></div>
+        <div class="where">sources.json — <code>clarketm</code> (parser <code>text_ipport</code>, tanpa field <code>protocol</code>)</div>
+        <p>
+          <code>fetch.py</code> memakai <code>spec.get("protocol")</code> sebagai nilai
+          bawaan. Untuk sumber JSON, parser mengisinya sendiri sehingga aman; untuk sumber
+          teks, tidak ada yang mengisi, sehingga URL jadi literal string <code>"None"</code>.
+        </p>
+        <pre>_parse_line_ip_port("170.239.207.241:999", "clarketm", None)
+→ Candidate(proxy_url="None://170.239.207.241:999", protocol=None)</pre>
+        <p class="konsekuensi">
+          <b>Akibatnya (dan ini penting):</b> cacat ini <b>laten</b>, bukan pencemaran DB.
+          URL <code>None://</code> kalah dalam deduplikasi melawan entri sah dari sumber
+          lain, dan kalaupun lolos, <code>testers.live_probe</code> menolaknya lebih dulu
+          (<code>scheme_None_tak_bisa_diuji_httpx</code>, sudah saya buktikan). Jadi efek
+          nyatanya: kandidat dari sumber itu sia-sia diuji, memakai slot konkurensi, tanpa
+          pernah bisa masuk DB. Dua sumber JSON lain
+          (<code>monosans</code>, <code>geonode</code>) aman karena parsernya mengisi protokol.
+        </p>
+      </article>
+
+      <article class="finding" data-sev="sedang">
+        <div class="f-head">
+          <span class="f-num">05</span>
+          <h3 class="f-title">Tulisan setup yang berbohong, dan 200 baris kode mati</h3>
+          <span class="sev" data-s="sedang">sedang</span>
+        <span class="sev" style="background:transparent;border:1px solid #2f5d34;color:#2f5d34">✅ diperbaiki</span></div>
+        <div class="where">README.md:95 · reorder.py:4 · src/injected.py · verify_9router.py</div>
+        <ul class="plain">
+          <li><b>README</b> menjual <code>--dry-run</code> sebagai "tanpa mengubah isi database" padahal justru itu cacat 01.</li>
+          <li><b>reorder.py</b> menyebut dirinya dipanggil dari "menu run.sh pilihan 3", padahal <code>run.sh</code> sudah menjadi 1-klik tanpa menu sejak commit <code>9a22eca</code>.</li>
+          <li><b>src/injected.py</b> (200 baris, ikut ter-commit) tidak diimpor siapa pun. Isinya duplikat logika <code>db.py</code>, termasuk fungsi <code>push_custom_on_top</code> yang <b>berbeda</b> dari <code>order_rows</code> dan bahkan menambah 1 ms pada baseline. Siapa pun yang memanggilnya akan mendapat perilaku urutan yang berbeda.</li>
+          <li><b>verify_9router.py</b> tak terdokumentasi di mana pun (lihat cacat 02).</li>
+        </ul>
+      </article>
+
+      <article class="finding" data-sev="sedang">
+        <div class="f-head">
+          <span class="f-num">06</span>
+          <h3 class="f-title">Cadangan menumpuk 307 MB tanpa pernah disapu</h3>
+          <span class="sev" data-s="sedang">sedang</span>
+        <span class="sev" style="background:transparent;border:1px solid #2f5d34;color:#2f5d34">✅ diperbaiki</span></div>
+        <div class="where">farm.py:80 · folder <code>backups/</code></div>
+        <p>
+          Rotasi hanya menyapu folder berprefiks <code>pre-run-</code>. Tiga folder
+          <code>pre-farm-*</code> dari versi v1 tidak pernah cocok dengan filter itu sehingga
+          tidak akan pernah dihapus.
+        </p>
+        <pre>old = sorted(d for d in os.listdir(dest_root) if d.startswith("pre-run-"))
+while len(old) &gt; keep: ...        # "pre-farm-*" tak pernah masuk daftar ini</pre>
+        <p class="konsekuensi">
+          <b>Akibatnya:</b> seluruh <code>backups/</code> kini 307 MB dan hanya bertambah.
+          Di mesin dengan RAM 3,6 GB dan ruang disk terbatas, ini biaya yang tak pernah
+          dihitung siapa pun.
+        </p>
+      </article>
+
+      <article class="finding" data-sev="sedang">
+        <div class="f-head">
+          <span class="f-num">07</span>
+          <h3 class="f-title">GeoIP lewat HTTP polos untuk lalu lintas yang sensitif</h3>
+          <span class="sev" data-s="sedang">sedang</span>
+        <span class="sev" style="background:transparent;border:1px solid #5b6270;color:#5b6270">⛔ dibatalkan</span></div>
+        <div class="where">src/geo.py:17</div>
+        <p>
+          <code>ip-api.com/batch</code> dipanggil lewat <code>http://</code>, bukan
+          <code>https://</code>. Isi permintaannya adalah daftar IP keluar dari proxy yang
+          baru saja lolos uji.
+        </p>
+        <p class="konsekuensi">
+          <b>Akibatnya:</b> pihak di jalur jaringan bisa membaca seluruh daftar IP itu dan
+          mengubah jawabannya. Dampaknya ringan (label negara pada nama proxy bisa salah),
+          tetapi ini satu-satunya permintaan keluar di proyek yang tidak terenkripsi.
+          Endpoint yang sama melayani HTTPS secara gratis.
+        </p>
+      </article>
+
+      <article class="finding" data-sev="sedang">
+        <div class="f-head">
+          <span class="f-num">08</span>
+          <h3 class="f-title">Status TLS dimatikan saat menguji proxy asing</h3>
+          <span class="sev" data-s="sedang">sedang</span>
+        <span class="sev" style="background:transparent;border:1px solid #5b6270;color:#5b6270">⛔ dibatalkan</span></div>
+        <div class="where">src/testers.py:52 · verify_9router.py:76 &amp; 105</div>
+        <p>
+          Setiap uji memakai <code>verify=False</code>, sehingga sertifikat TLS tidak
+          diperiksa. Padahal uji inilah satu-satunya penyaring antara internet terbuka dan
+          kredensial provider AI yang dioper 9router.
+        </p>
+        <p class="konsekuensi">
+          <b>Akibatnya:</b> proxy yang melakukan intersepsi TLS (sertifikat palsu) tetap
+          dinyatakan sehat dan diberi label <code>active</code>. Untuk uji kelayakan
+          fungsional ini bisa dimaklumi, tetapi statusnya sebagai penjaga keamanan tidak
+          pernah disebut, sementara README justru menonjolkan "verifikasi HTTPS CONNECT
+          nyata". Bagian yang lebih berisiko sebenarnya adalah 9router sendiri yang
+          mengirim API key provider lewat proxy publik ini.
+        </p>
+      </article>
+
+    </div>
+  </section>
+
+  <section>
+    <h2>Hipotesis yang gugur</h2>
+    <p style="margin:0 0 1rem;color:var(--fg-muted);font-size:.93rem">
+      Empat kecurigaan saya sendiri tidak lolos pengujian dan tidak masuk daftar temuan.
+      Saya catat supaya tidak diaudit ulang dengan kesimpulan yang sama.
+    </p>
+    <div class="tablewrap">
+      <table>
+        <thead>
+          <tr><th>Dugaan</th><th>Hasil pengujian</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>reorder.py</code> menandai pelanggaran palsu karena <code>order_rows</code> menulis ulang stempel vercel</td>
+            <td>Disimulasikan pada salinan DB: <b>0 dari 100</b> baris vercel/cloudflare berubah. Idempoten, penjaga bekerja.</td>
+          </tr>
+          <tr>
+            <td><code>tcp_probe</code> membocorkan socket pada ribuan proxy mati</td>
+            <td>300 probe timeout berturut-turut: deskriptor berkas tetap 7, delta <b>0</b>. Tidak bocor.</td>
+          </tr>
+          <tr>
+            <td><code>mark_result</code> kehilangan pembaruan karena SELECT-lalu-UPDATE</td>
+            <td>Seluruh penulisan sudah dibungkus <code>BEGIN IMMEDIATE</code> + <code>busy_timeout=60s</code>. Terlalu lemah untuk dilaporkan.</td>
+          </tr>
+          <tr>
+            <td>Baris <code>error</code> menumpuk di kolam rotasi karena strike tak pernah dipangkas</td>
+            <td><b>0</b> baris <code>isActive=1</code> berstatus <code>error</code>. <code>mark_result</code> memang selalu menyinkronkan keduanya.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <h2>Yang sudah benar dan jangan diubah</h2>
+    <div class="assurance">
+      <h3>Rangkap keamanan relay terbukti utuh</h3>
+      <ul>
+        <li>Uji <code>order_rows</code> pada salinan DB: 50 vercel + 50 cloudflare, <b>nol</b> yang tersentuh.</li>
+        <li>Penjaga <code>only_prune_owned</code> bekerja: 290 baris ber-strike tinggi yang bukan milik tool sengaja dipertahankan.</li>
+        <li>Tidak ada satu pun baris <code>None://</code> yang mencemari DB, meski sumber <code>clarketm</code> cacat.</li>
+        <li>Dukungan <code>socks5://</code> sah: undici di dalam 9router memuat <code>Socks5Client</code>, dan uji langsung membuktikan 4 dari 6 proxy socks5 sampel benar-benar hidup.</li>
+        <li>Sanitasi IP privat, deduplikasi, dan parser <code>ipaddress</code> menolak halaman CAPTCHA dengan benar.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section>
+    <h2>Urutan perbaikan yang saya sarankan</h2>
+    <div class="tablewrap">
+      <table>
+        <thead>
+          <tr><th>Prioritas</th><th>Perbaikan</th><th>Perkiraan usaha</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>1</td>
+            <td>Bungkus blok <code>mark_result</code> dengan <code>if not args.dry_run</code> (cacat 01)</td>
+            <td class="mono">satu baris</td>
+          </tr>
+          <tr>
+            <td>2</td>
+            <td>Hapus atau beri gerbang nyata pada <code>--mode</code> dan <code>deep_test_top_n</code> (cacat 03)</td>
+            <td class="mono">kecil</td>
+          </tr>
+          <tr>
+            <td>3</td>
+            <td>Tambahkan field <code>protocol</code> pada <code>clarketm</code> di <code>sources.json</code> (cacat 04)</td>
+            <td class="mono">satu baris</td>
+          </tr>
+          <tr>
+            <td>4</td>
+            <td>Pakai <code>verify_9router.py</code> sebagai gerbang mutu, dan dokumentasikan (cacat 02)</td>
+            <td class="mono">sedang</td>
+          </tr>
+          <tr>
+            <td>5</td>
+            <td>Perbaiki klaim README, hapus <code>injected.py</code>, benahi rotasi cadangan (cacat 05, 06)</td>
+            <td class="mono">kecil</td>
+          </tr>
+          <tr>
+            <td>6</td>
+            <td>Ubah GeoIP ke HTTPS dan pertimbangkan <code>verify=True</code> pada uji final (cacat 07, 08)</td>
+            <td class="mono">kecil</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <h2>Bagaimana temuan ini diperoleh</h2>
+    <ul class="plain">
+      <li>Seluruh 1.709 baris kode dibaca langsung, bukan diringkas otomatis.</li>
+      <li>Cacat 01 dibuktikan dengan menjalankan <code>--dry-run</code> pada <b>salinan</b> DB di <code>/tmp</code>, lalu membandingkan jumlah strike sebelum dan sesudah. Database asli tidak pernah ditulis.</li>
+      <li>Cacat 03–04 dibuktikan dengan memanggil fungsi parser langsung dan mencetak hasilnya.</li>
+      <li>Hipotesis yang gugur diuji dengan cara yang sama: simulasi <code>order_rows</code> pada salinan, 300 probe timeout untuk menghitung deskriptor berkas, dan uji hidup 12 proxy sampel.</li>
+      <li>Perilaku 9router diverifikasi pada bundle aplikasinya (<code>.next-cli-build/server</code>), termasuk cara ia memilih proxy dari kolom <code>isActive</code>.</li>
+    </ul>
+  </section>
+
+  <footer>
+    <span>Audit statis + uji terisolasi · DB gateway tidak pernah ditulis · proses next-server tidak disentuh</span>
+    <span>Repo: proxy-farm-9router @ 5f70b34 · sinkron di GitLab &amp; Codeberg</span>
+  </footer>
+
+</div>
