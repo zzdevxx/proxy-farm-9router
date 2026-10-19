@@ -87,6 +87,9 @@ def order_rows(con, groups: list[str], top_id: str | None = None) -> int:
     diberi stempel unik yang mundur 1 ms supaya urutannya deterministik.
     Baseline-nya diambil dari updatedAt teratas yang sudah ada (bukan jam
     dinding — celah zona waktu pernah merusak urutan sekali, jangan diulang).
+
+    `top_id` = kode negara yang bloknya didahulukan di dalam type=http
+    (dipakai mode Indonesia supaya proxy ID tampil paling atas).
     """
     rows = row_view(con)
     if not rows:
@@ -107,11 +110,19 @@ def order_rows(con, groups: list[str], top_id: str | None = None) -> int:
     )
     n = 0
     for g in groups:
-        # Urutkan berdasarkan prioritas: aktif dulu -> latensi terendah (tercepat) -> nama
+        # Saat `top_id` diminta (mode Indonesia), negara jadi kunci PERTAMA
+        # supaya blok ID tampil solid di atas — bukan diselipi ratusan baris
+        # non-ID yang kebetulan aktif. Di dalam blok itu, yang aktif tetap
+        # didahulukan, lalu yang tercepat.
+        # Tanpa `top_id`, urutannya tetap seperti semula: aktif dulu → latensi.
         def sort_key(x):
             is_inactive = 0 if x.get("testStatus") == "active" else 1
-            lat = (x.get("data") or {}).get("latencyMs")
+            d = x.get("data") or {}
+            lat = d.get("latencyMs")
             lat_val = lat if (lat is not None and lat > 0) else 999999
+            if top_id:
+                cc_rank = 0 if d.get("country") == top_id else 1
+                return (cc_rank, is_inactive, lat_val, x.get("name") or "")
             return (is_inactive, lat_val, x.get("name") or "")
 
         for r in sorted(by_type[g], key=sort_key):
@@ -167,6 +178,230 @@ def prune_dead(con, scope: dict, local_ip_ok: bool = False) -> dict:
         "skipped_bound": [r["name"] for r in skipped_bound],
         "skipped_grace": len(skipped_grace),
     }
+
+
+def set_active(con, ids: list[str], active: bool, now: str) -> int:
+    """Nyalakan/matikan baris tertentu tanpa menghapusnya.
+
+    9router memilih proxy dari kolam dengan `isActive` saja, jadi mematikan
+    satu baris cukup untuk mengeluarkannya dari peredaran — datanya tetap
+    utuh dan bisa dinyalakan kembali kapan saja.
+
+    `testStatus` ikut disinkronkan. Kalau tidak, baris bisa ber-`isActive=0`
+    tapi `testStatus='active'`, dan pengurutan akan menganggapnya sehat
+    sehingga baris mati tetap muncul di urutan teratas.
+    """
+    if not ids:
+        return 0
+    cur = con.cursor()
+    cur.execute("BEGIN IMMEDIATE")
+    try:
+        n = 0
+        for pid in ids:
+            row = cur.execute(
+                "SELECT data, testStatus FROM proxyPools WHERE id=?", (pid,)
+            ).fetchone()
+            if not row:
+                continue
+            d = json.loads(row[0])
+            status_lama = row[1]
+            if active:
+                d.pop("disabledAt", None)
+                d.pop("disabledReason", None)
+                status_baru = "active"
+            else:
+                d["disabledAt"] = now
+                d["disabledReason"] = "dimatikan mode"
+                # 'error' dipertahankan supaya alasan kegagalannya tidak hilang;
+                # selain itu ditandai 'disabled' agar jelas bukan hasil uji.
+                status_baru = status_lama if status_lama == "error" else "disabled"
+            cur.execute(
+                "UPDATE proxyPools SET isActive=?, testStatus=?, data=json(?) WHERE id=?",
+                (1 if active else 0, status_baru, json.dumps(d), pid),
+            )
+            n += 1
+        con.execute("COMMIT")
+        return n
+    except Exception:
+        try:
+            con.execute("ROLLBACK")
+        except Exception:
+            pass
+        raise
+
+
+def set_country(con, mapping: dict[str, dict], now: str) -> int:
+    """Simpan hasil GeoIP ke baris yang belum punya negara.
+
+    Dipakai mode Indonesia: tanpa langkah ini, ratusan baris tanpa label akan
+    dianggap 'bukan Indonesia' dan ikut dimatikan, padahal sebagiannya justru
+    proxy Indonesia.
+    """
+    if not mapping:
+        return 0
+    cur = con.cursor()
+    cur.execute("BEGIN IMMEDIATE")
+    try:
+        n = 0
+        for pid, geo in mapping.items():
+            row = cur.execute(
+                "SELECT data FROM proxyPools WHERE id=?", (pid,)
+            ).fetchone()
+            if not row:
+                continue
+            d = json.loads(row[0])
+            cc = geo.get("country_code")
+            if not cc or cc == "??":
+                continue
+            d["country"] = cc
+            if geo.get("country"):
+                d["countryName"] = geo["country"]
+            if geo.get("isp") and geo["isp"] != "-":
+                d["isp"] = geo["isp"]
+            # Nama ikut dilabeli [CC] supaya baris lama yang belum pernah
+            # lewat jalur inject tetap terbaca negaranya di dashboard.
+            nm = d.get("name") or ""
+            if nm and not nm.startswith("["):
+                d["name"] = f"[{cc}] {nm}"
+            d["geoLabeledAt"] = now
+            cur.execute(
+                "UPDATE proxyPools SET data=json(?) WHERE id=?", (json.dumps(d), pid)
+            )
+            n += 1
+        con.execute("COMMIT")
+        return n
+    except Exception:
+        try:
+            con.execute("ROLLBACK")
+        except Exception:
+            pass
+        raise
+
+
+def prune_ids(con, ids: list[str]) -> dict:
+    """Hapus baris berdasarkan id, apa pun pemilik dan statusnya.
+
+    Dipakai mode 3: baris sudah diuji dan ditandai mati oleh pemanggil, jadi
+    di sini tidak perlu menebak lagi. Baris yang terikat koneksi provider
+    tetap ditahan — 9router akan menolak menghapusnya.
+    """
+    if not ids:
+        return {"pruned": [], "skipped_bound": [], "skipped_grace": 0}
+    want = set(ids)
+    rows = [r for r in row_view(con) if r["id"] in want]
+    bound = bound_connection_ids(con)
+    pruned, skipped_bound = [], []
+    cur = con.cursor()
+    try:
+        cur.execute("BEGIN IMMEDIATE")
+        for r in rows:
+            if r["id"] in bound:
+                skipped_bound.append(r)
+                continue
+            cur.execute("DELETE FROM proxyPools WHERE id=?", (r["id"],))
+            pruned.append({"id": r["id"], "name": r["name"], "url": r["proxyUrl"]})
+        con.execute("COMMIT")
+    except Exception:
+        try:
+            con.execute("ROLLBACK")
+        except Exception:
+            pass
+        raise
+    return {
+        "pruned": pruned,
+        "skipped_bound": [r["name"] for r in skipped_bound],
+        "skipped_grace": 0,
+    }
+
+
+def prune_dead_any_owner(con, prune_types: list[str], now: str) -> dict:
+    """Hapus baris mati TANPA memandang pemiliknya (mode 3 & 4).
+
+    Berbeda dari prune_dead: penjaga `only_prune_owned` sengaja dilepas supaya
+    baris warisan v1 (free-*) yang sudah mati ikut bersih. Baris yang masih
+    `active` tidak pernah disentuh.
+    """
+    rows = row_view(con)
+    bound = bound_connection_ids(con)
+    pruned, skipped_bound = [], []
+    cur = con.cursor()
+    try:
+        cur.execute("BEGIN IMMEDIATE")
+        for r in rows:
+            if r["type"] not in prune_types:
+                continue
+            if r["testStatus"] == "active":
+                continue
+            if r["id"] in bound:
+                skipped_bound.append(r)
+                continue
+            cur.execute("DELETE FROM proxyPools WHERE id=?", (r["id"],))
+            pruned.append({"id": r["id"], "name": r["name"], "url": r["proxyUrl"]})
+        con.execute("COMMIT")
+    except Exception:
+        try:
+            con.execute("ROLLBACK")
+        except Exception:
+            pass
+        raise
+    return {
+        "pruned": pruned,
+        "skipped_bound": [r["name"] for r in skipped_bound],
+        "skipped_grace": 0,
+    }
+
+
+def delete_all_of_types(con, types: list[str]) -> dict:
+    """Hapus SEMUA baris bertipe tertentu (mode 4: bersih total).
+
+    Relay vercel/cloudflare tidak pernah masuk daftar ini — penjaga di
+    pemanggil memverifikasi jumlahnya sebelum dan sesudah.
+    """
+    placeholders = ",".join("?" for _ in types)
+    cur = con.cursor()
+    cur.execute("BEGIN IMMEDIATE")
+    try:
+        victims = cur.execute(
+            f"SELECT id, data FROM proxyPools WHERE json_extract(data,'$.type')"
+            f" IN ({placeholders})",
+            types,
+        ).fetchall()
+        for pid, _d in victims:
+            cur.execute("DELETE FROM proxyPools WHERE id=?", (pid,))
+        con.execute("COMMIT")
+        return {"deleted": len(victims)}
+    except Exception:
+        try:
+            con.execute("ROLLBACK")
+        except Exception:
+            pass
+        raise
+
+
+def relay_snapshot(con) -> dict[str, tuple]:
+    """Tangkap keadaan baris vercel & cloudflare: (id -> (isActive, type)).
+
+    Stempel `updatedAt` sengaja TIDAK ikut dibandingkan. Mengurutkan ulang
+    memang menulis stempel baru ke setiap baris termasuk relay — itu mekanisme
+    urutannya, bukan pelanggaran. Yang benar-benar tidak boleh terjadi adalah
+    relay ikut terhapus atau termatikan.
+    """
+    out: dict[str, tuple] = {}
+    for r in row_view(con):
+        if r["type"] in ("vercel", "cloudflare"):
+            out[r["id"]] = (r["isActive"], r["type"])
+    return out
+
+
+def assert_relays_untouched(before: dict[str, tuple], after: dict[str, tuple]) -> None:
+    """Gagal keras kalau ada relay yang hilang, bertambah, atau dimatikan."""
+    hilang = [i for i in before if i not in after]
+    mati = [i for i, st in after.items() if i in before and st[0] != before[i][0]]
+    if hilang or mati:
+        raise RuntimeError(
+            f"RANGKAP MELANGAR: {len(hilang)} relay hilang, "
+            f"{len(mati)} relay berubah status aktif — operasi dibatalkan"
+        )
 
 
 def mark_result(con, pid: str, verdict, *, is_new_row: bool, now: str) -> dict:

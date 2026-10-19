@@ -7,6 +7,36 @@ _HOSTNAME = re.compile(
 )
 
 
+def backup_db(db_path, backup_dir, keep, repo_root):
+    """Salin DB (+WAL) sebelum operasi tulis. Rotasi: sisakan `keep` terbaru.
+
+    Menyapu 'pre-run-*' maupun 'pre-farm-*' — folder lama dari versi v1
+    tidak boleh tumbuh selamanya.
+    """
+    import datetime
+    import os
+    import shutil
+
+    if not os.path.exists(db_path):
+        return None
+    dest_root = os.path.join(repo_root, backup_dir)
+    os.makedirs(dest_root, exist_ok=True)
+    stamp = datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%d-%H%M%S")
+    dest = os.path.join(dest_root, f"pre-run-{stamp}")
+    os.makedirs(dest, exist_ok=True)
+    shutil.copy2(db_path, os.path.join(dest, "data.sqlite"))
+    for ext in ("-wal", "-shm"):
+        p = db_path + ext
+        if os.path.exists(p):
+            shutil.copy2(p, os.path.join(dest, f"data.sqlite{ext}"))
+    old = sorted(
+        d for d in os.listdir(dest_root) if d.startswith(("pre-run-", "pre-farm-"))
+    )
+    while len(old) > keep:
+        shutil.rmtree(os.path.join(dest_root, old.pop(0)), ignore_errors=True)
+    return dest
+
+
 def parse_endpoint(token):
     """Terima 'host:port'. Balikkan (host, port) atau None.
 

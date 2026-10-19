@@ -85,12 +85,29 @@ pip install -r requirements.txt
 ### 3. Jalankan
 
 **Cara Termudah (1 Klik di Desktop Linux/XFCE):**
-Klik ganda ikon **Proxy Farm 9Router** di Desktop Anda!
+Klik ganda ikon **Proxy Farm 9Router** di Desktop Anda, lalu pilih mode
+(otomatis memilih mode 1 dalam 10 detik):
+
+| Menu | Mode | Yang dikerjakan |
+|---|---|---|
+| **1** | Auto penuh | Cek proxy 9Router → buang yang mati → tarik sumber → uji → suntik → rapikan |
+| **2** | Mode Indonesia | Label negara yang kosong → aktifkan **hanya IP Indonesia** → matikan sisanya (tidak dihapus) → taruh ID di atas |
+| **3** | Cek & bersihkan | Uji **semua** proxy custom → hapus yang mati, termasuk sisa lama `free-*` |
+| **4** | Clean total | Hapus **semua** proxy custom (`type=http`) — perlu ketik `HAPUS` |
+
+> **Relay vercel & cloudflare tidak pernah disentuh mode apa pun.** Setiap operasi
+> membandingkan keadaan relay sebelum dan sesudah; kalau ada yang hilang atau
+> termatikan, operasi dibatalkan dengan galat, bukan dilanjutkan diam-diam.
 
 **Melalui Terminal:**
 ```bash
-# Menjalankan auto-sync penuh (recheck, pangkas, ambil baru, inject, rapikan)
+# Mode 1 — auto penuh (perilaku default)
 ./run.sh
+
+# Mode lain bisa langsung lewat CLI:
+python3 farm.py --action indonesia      # fokus IP Indonesia untuk geo-restriction
+python3 farm.py --action cek            # uji semua & hapus yang mati
+python3 farm.py --action clean --confirm HAPUS   # bersihkan semua proxy custom
 
 # Uji coba tanpa mengubah isi database (Dry Run)
 # Proxy diuji dan hasilnya dilaporkan, tetapi TIDAK ditulis ke DB:
@@ -108,6 +125,19 @@ python3 reorder.py
 # openrouter.ai/api/v1/models, bukan sekadar keluar ke internet.
 python3 verify_9router.py -n 50 --active-only
 ```
+
+### Catatan mode Indonesia
+
+Mode 2 menargetkan **IP lokal Indonesia**, biasanya untuk layanan yang membatasi
+akses berdasarkan wilayah. Tiga hal yang perlu diketahui:
+
+1. **Label negara dilengkapi lebih dulu.** Baris lama warisan v1 belum punya
+   field `country`; tanpa pelabelan, ratusan baris itu akan dianggap bukan
+   Indonesia dan ikut dimatikan — padahal sebagiannya justru proxy ID.
+2. **Hanya protokol `http`/`https` yang diaktifkan.** Proxy `socks5` dimatikan
+   di mode ini. Jumlah proxy ID yang hidup biasanya 20–40 dari ~200 kandidat.
+3. **Tidak ada yang dihapus.** Baris non-ID hanya dimatikan (`isActive=0`), jadi
+   bisa dinyalakan kembali dengan menjalankan mode 1.
 
 > **Catatan mode uji.** `--dry-run` tidak menulis apa pun ke DB. `--mode tcp` melewati
 > tahap uji exit-IP sepenuhnya: kandidat yang lolos TCP langsung disuntik tanpa bukti

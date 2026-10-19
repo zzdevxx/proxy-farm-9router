@@ -35,6 +35,7 @@ from src import fetch as fetch_mod
 from src import geo as geomod
 from src import report as report_mod
 from src import testers
+from src import util as utilmod
 
 
 def now_iso() -> str:
@@ -66,21 +67,7 @@ def load_config(path: str) -> dict:
 
 def backup_db(db_path: str, backup_dir: str, keep: int) -> str | None:
     """Salin DB (+WAL) sebelum run. Rotasi: sisakan `keep` cadangan terakhir."""
-    if not os.path.exists(db_path):
-        return None
-    dest_root = os.path.join(HERE, backup_dir)
-    os.makedirs(dest_root, exist_ok=True)
-    dest = os.path.join(dest_root, f"pre-run-{datetime.now(timezone.utc):%Y%m%d-%H%M%S}")
-    os.makedirs(dest, exist_ok=True)
-    shutil.copy2(db_path, os.path.join(dest, "data.sqlite"))
-    for ext in ("-wal", "-shm"):
-        p = db_path + ext
-        if os.path.exists(p):
-            shutil.copy2(p, os.path.join(dest, f"data.sqlite{ext}"))
-    old = sorted(d for d in os.listdir(dest_root) if d.startswith(("pre-run-", "pre-farm-")))
-    while len(old) > keep:
-        shutil.rmtree(os.path.join(dest_root, old.pop(0)), ignore_errors=True)
-    return dest
+    return utilmod.backup_db(db_path, backup_dir, keep, HERE)
 
 
 def parse_endpoint(url: str) -> tuple[str, int]:
@@ -129,6 +116,40 @@ async def run(args) -> int:
     lip = local_ip()
 
     try:
+        # ── mode khusus: indonesia / cek / clean ─────────────────────────
+        action = getattr(args, "action", None) or "auto"
+        if action != "auto":
+            if action == "clean" and (getattr(args, "confirm", None) or "") != "HAPUS":
+                print("  mode clean butuh konfirmasi: tambahkan --confirm HAPUS",
+                      file=sys.stderr)
+                return 3
+            bkp0 = backup_db(db_path, cfg["database"]["backup_dir"],
+                             cfg["database"]["keep_backups"])
+            if bkp0:
+                print(f"\n  [0] cadangan DB -> {bkp0}")
+            from src import modes as modes_mod
+            if action == "indonesia":
+                hasil = await modes_mod.mode_indonesia(con, cfg)
+                if hasil.get("id_aktif", 0) < modes_mod.ID_RENDAH:
+                    print(f"\n  [e] proxy ID aktif cuma {hasil.get('id_aktif')} — "
+                          f"menarik kandidat ID baru dari {len(sources)} sumber...")
+                    tambah = await modes_mod.tarik_proxy_id(
+                        con, cfg, sources, farm_mod=fetch_mod
+                    )
+                    hasil.update(tambah)
+            elif action == "cek":
+                hasil = await modes_mod.mode_cek_bersihkan(con, cfg)
+            else:
+                hasil = modes_mod.mode_clean(con, cfg)
+            print("\n" + "=" * 66)
+            print(f"  SELESAI — mode {action}")
+            print("=" * 66)
+            for k, v in hasil.items():
+                print(f"   {k:20s} {v}")
+            integ = con.execute("PRAGMA integrity_check(1)").fetchone()[0]
+            print(f"   {'integrity':20s} {integ}")
+            return 0 if integ == "ok" else 1
+
         # ── 1) backup + snapshot kondisi DB ───────────────────────────────
         bkp = backup_db(db_path, cfg["database"]["backup_dir"], cfg["database"]["keep_backups"])
         if bkp:
@@ -488,6 +509,11 @@ def main():
     p.add_argument("--limit-sources", default=None, help="id sumber, koma dipisah")
     p.add_argument("--recheck-only", action="store_true",
                    help="hanya uji ulang dan pangkas proxy lama di DB, lewati fetch baru")
+    p.add_argument("--action", choices=["auto", "indonesia", "cek", "clean"], default=None,
+                   help="auto (default) | indonesia (fokus IP ID) | cek (uji & hapus mati) "
+                        "| clean (hapus semua proxy custom)")
+    p.add_argument("--confirm", default=None,
+                   help="untuk --action clean: isi dengan HAPUS sebagai konfirmasi")
     args = p.parse_args()
     try:
         raise SystemExit(asyncio.run(run(args)))
