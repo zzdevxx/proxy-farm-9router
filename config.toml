@@ -21,15 +21,25 @@ exit_ip_endpoints = ["https://api.ipify.org", "https://icanhazip.com"]
 deep_test_top_n = 1000
 deep_test_timeout = 5.0
 
-# Proxy yang gagal uji: diberi tenggat (strike) sebelum dihapus.
-# 2 = gagal 2x berturut-turut baru dibuang dari DB.
-grace_strikes = 2
+# Proxy yang gagal uji: langsung dibuang agar DB bebas dari proxy zombie.
+# 1 = gagal pada run ini langsung dipangkas dari DB.
+grace_strikes = 1
 
 # Target proxy hidup baru per putaran:
 # Begitu jumlah proxy baru yang terbukti hidup mencapai target ini,
 # pengujian kandidat berikutnya langsung diselesaikan (early-exit hemat waktu).
 # 0 = uji semua kandidat tanpa batas.
-target_fresh_alive = 800
+target_fresh_alive = 50
+
+[opencode]
+# Validasi langsung ke model OpenCode deepseek-v4.1-flash-free:
+# Proxy yang diblokir Cloudflare 403 (Abusive traffic) atau timeout
+# langsung dibuang. Hanya proxy yang benar-benar bisa menghasilkan
+# respon AI yang disuntikkan ke DB.
+validate = true
+model = "oc/deepseek-v4.1-flash-free"
+timeout = 5.0
+max_verified = 20
 
 [test]
 mode = "deep"
@@ -39,9 +49,9 @@ mode = "deep"
 # Semua recheck/prune hanya berlaku pada type=http (custom + hasil farm).
 recheck_types = ["http"]
 prune_types = ["http"]
-# Hanya baris bertanda `importedSource` (milik tool) yang boleh dihapus.
-# Baris custom awal yang tak bertanda itu dipertahankan.
-only_prune_owned = true
+# false = semua proxy custom (type=http) yang mati akan dipangkas,
+# termasuk sisa lama v1 (free-*). Vercel & Cloudflare tetap 100% aman.
+only_prune_owned = false
 
 [order]
 # Susunan daftar di dashboard 9router: custom (paling atas) -> vercel -> cloudflare

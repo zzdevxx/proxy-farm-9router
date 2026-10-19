@@ -158,3 +158,83 @@ async def deep_probe(
     if not tcp.alive:
         return tcp
     return await live_probe(proxy_url, None, deep_timeout, local_ip)
+
+
+def is_9router_online(base_url: str = "http://localhost:20128") -> bool:
+    """Cek apakah gateway 9router aktif di localhost."""
+    try:
+        with httpx.Client(timeout=1.5) as c:
+            r = c.get(f"{base_url}/api/health")
+            return r.status_code == 200 and r.json().get("ok") is True
+    except Exception:
+        return False
+
+
+def get_9router_api_key(db_path: str) -> str | None:
+    """Ambil API key aktif dari database 9router."""
+    import sqlite3
+    try:
+        con = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
+        row = con.execute("SELECT key FROM apiKeys WHERE isActive=1 LIMIT 1").fetchone()
+        con.close()
+        return row[0] if row else None
+    except Exception:
+        return None
+
+
+async def test_opencode_proxy_via_9router(
+    proxy_id: str,
+    db_path: str,
+    api_key: str,
+    base_url: str = "http://localhost:20128",
+    model: str = "oc/deepseek-v4.1-flash-free",
+    timeout: float = 6.0,
+) -> tuple[bool, str]:
+    """Uji nyata apakah proxy bisa tembus model DeepSeek di OpenCode via 9Router.
+
+    Jika IP diblokir Cloudflare/OpenCode anti-abuse (403 Abusive Traffic) atau
+    timeout, kembalikan (False, reason).
+    Jika OpenCode merespon token (200 OK), kembalikan (True, '200_ok').
+    """
+    import json
+    import sqlite3
+
+    con = sqlite3.connect(db_path, timeout=10)
+    orig_data = con.execute("SELECT data FROM settings WHERE id=1").fetchone()[0]
+    try:
+        nd = json.loads(orig_data)
+        strats = dict(nd.get("providerStrategies") or {})
+        strats["opencode"] = {"proxyPoolId": proxy_id, "rotateStrategy": "none"}
+        nd["providerStrategies"] = strats
+        con.execute("UPDATE settings SET data=? WHERE id=1", (json.dumps(nd),))
+        con.commit()
+        con.close()
+
+        async with httpx.AsyncClient(timeout=timeout) as client:
+            resp = await client.post(
+                f"{base_url}/v1/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {api_key}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "model": model,
+                    "messages": [{"role": "user", "content": "1"}],
+                    "max_tokens": 1,
+                },
+            )
+        body = resp.text
+        if resp.status_code == 200:
+            return True, "200_ok"
+        elif "abusive traffic" in body or "FreeTierError" in body:
+            return False, "403_abusive_ip"
+        else:
+            return False, f"status_{resp.status_code}"
+    except Exception as e:
+        return False, f"error:{type(e).__name__}"
+    finally:
+        con_r = sqlite3.connect(db_path, timeout=10)
+        con_r.execute("UPDATE settings SET data=? WHERE id=1", (orig_data,))
+        con_r.commit()
+        con_r.close()
+

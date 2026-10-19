@@ -396,6 +396,54 @@ async def run(args) -> int:
             else:
                 print(f"  [6] {inserted} proxy baru masuk ke DB")
 
+            # ── 6b) OpenCode DeepSeek Validator ─────────────────────────────
+            # Validasi nyata: jika proxy tidak bisa dipakai di OpenCode (diblokir 403
+            # abusive traffic atau timeout), proxy LANGSUNG DIBUANG dari DB.
+            opencode_cfg = cfg.get("opencode", {})
+            if opencode_cfg.get("validate", True):
+                api_key = testers.get_9router_api_key(db_path)
+                if api_key and testers.is_9router_online():
+                    model_oc = opencode_cfg.get("model", "oc/deepseek-v4.1-flash-free")
+                    to_oc = opencode_cfg.get("timeout", 5.0)
+                    target_verified = opencode_cfg.get("max_verified", 20)
+
+                    active_rows = [
+                        r for r in dbmod.row_view(con)
+                        if r["type"] == "http" and r["testStatus"] == "active"
+                    ]
+                    # Prioritaskan proxy ID dulu, lalu urut latensi terendah
+                    active_rows.sort(key=lambda r: (
+                        0 if (r["data"] or {}).get("country") == "ID" else 1,
+                        (r["data"] or {}).get("latencyMs") or 999999,
+                    ))
+                    # Uji hingga target_verified proxy lolos
+                    print(f"\n  [6b] Validasi OpenCode DeepSeek ({model_oc})...")
+                    oc_passed = 0
+                    oc_pruned = 0
+                    for r in active_rows:
+                        if oc_passed >= target_verified:
+                            break
+                        ok, reason = await testers.test_opencode_proxy_via_9router(
+                            r["id"], db_path, api_key, model=model_oc, timeout=to_oc
+                        )
+                        if ok:
+                            oc_passed += 1
+                            print(f"       ✅ {r['name']:<36s} -> lolos OpenCode ({reason})")
+                        else:
+                            oc_pruned += 1
+                            print(f"       ❌ {r['name']:<36s} -> DIBUANG: tak bisa dipakai OpenCode ({reason})")
+                            con.execute("BEGIN IMMEDIATE")
+                            try:
+                                con.execute("DELETE FROM proxyPools WHERE id=?", (r["id"],))
+                                con.execute("COMMIT")
+                            except Exception:
+                                con.execute("ROLLBACK")
+                                pass
+
+                    print(f"       Hasil OpenCode: {oc_passed} lolos dipertahankan / {oc_pruned} dibuang dari DB")
+                else:
+                    print("\n  [6b] 9Router offline di localhost:20128 — validasi OpenCode dilewati")
+
         # ── 6) rangkap: vercel/cloudflare tak tersentuh ─────────────────
         after = dbmod.row_view(con)
         vc_before = {r["id"]: r["updatedAt"] for r in before if r["type"] in ("vercel", "cloudflare")}
@@ -405,16 +453,21 @@ async def run(args) -> int:
             # Ini tak boleh terjadi. Lebih baik gagal keras daripada diam.
             raise RuntimeError(f"RANGKAP MELANGAR: {len(touched)} baris vercel/cloudflare berubah")
 
-        # ── 7) rapikan urutan ──────────────────────────────────────────
+        # ── 7) rapikan urutan (prioritaskan [ID] di atas) ───────────────
         if args.do_order and not args.dry_run:
             con.execute("BEGIN IMMEDIATE")
             try:
-                n = dbmod.order_rows(con, cfg["order"]["groups"])
+                n = dbmod.order_rows(con, cfg["order"]["groups"], top_id="ID")
                 con.execute("COMMIT")
             except Exception:
                 con.execute("ROLLBACK")
                 raise
-            print(f"  [8] {n} baris disusun: " + " -> ".join(cfg["order"]["groups"]))
+            print(f"  [7] {n} baris disusun (prioritas [ID] di atas): " + " -> ".join(cfg["order"]["groups"]))
+
+            # Pastikan 9Router otomatis memutar proxy aktif untuk OpenCode
+            ok_strat = dbmod.enable_opencode_strategy(con, "round-robin")
+            if ok_strat:
+                print("  [7b] 9Router providerStrategies.opencode -> rotateStrategy: round-robin (aktif)")
         else:
             print("  [7] urutan dilewati (--dry-run / --no-order)")
 

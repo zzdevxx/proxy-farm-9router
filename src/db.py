@@ -468,3 +468,28 @@ def insert_new(con, cand, verdict, now: str) -> None:
             now,
         ),
     )
+
+
+def enable_opencode_strategy(con, strategy: str = "round-robin") -> bool:
+    """Pastikan 9Router otomatis memutar proxy aktif untuk OpenCode."""
+    try:
+        cur = con.cursor()
+        cur.execute("BEGIN IMMEDIATE")
+        row = cur.execute("SELECT data FROM settings WHERE id=1").fetchone()
+        if not row:
+            con.execute("ROLLBACK")
+            return False
+        d = json.loads(row[0])
+        ps = dict(d.get("providerStrategies") or {})
+        ps["opencode"] = {"rotateStrategy": strategy}
+        d["providerStrategies"] = ps
+        cur.execute("UPDATE settings SET data=? WHERE id=1", (json.dumps(d),))
+        con.execute("COMMIT")
+        return True
+    except Exception:
+        try:
+            con.execute("ROLLBACK")
+        except Exception:
+            pass
+        return False
+
