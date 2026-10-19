@@ -36,7 +36,6 @@ Kebanyakan proxy scraper publik memasukkan ribuan proxy mati atau proxy palsu ya
 - 🛡️ **Triple-Layer Relay Guard:** Relay Vercel dan Cloudflare Worker bawaan Anda (`*.unnesdev.workers.dev`) **100% READ-ONLY** dan terlindungi di 3 lapis sistem (*scope allowlist* ➔ *db query filter* ➔ *pre-commit assertion*).
 - 🧹 **Two-Strike Grace Reaper:** Proxy yang mati diberi kesempatan 2 kali uji berturut-turut sebelum dihapus agar tidak terbuang hanya karena timeout sesaat.
 - 📊 **Sorting Rapi:** Menjaga urutan tampilan dashboard 9Router tetap teratur: `Custom HTTP/SOCKS5` (teratas) ➔ `Vercel` ➔ `Cloudflare`.
-- 📊 **Sorting Rapi:** Menjaga urutan tampilan dashboard 9Router tetap teratur: `Custom HTTP/SOCKS5` (teratas) ➔ `Vercel` ➔ `Cloudflare`.
 
 ---
 
@@ -49,7 +48,7 @@ Kebanyakan proxy scraper publik memasukkan ribuan proxy mati atau proxy palsu ya
    [0. Auto-Backup]  ─── Salin data.sqlite ke backups/pre-run-* (auto-rotate 10)
           │
           ▼
-   [1. Fetch 54 Feeds] ── Tarik 700k+ kandidat ➔ Round-robin ➔ Dedup ➔ 15k kandidat fresh
+   [1. Fetch 62 Feeds] ── Tarik 750k+ kandidat ➔ Round-robin ➔ Dedup ➔ 15k kandidat fresh
           │
           ▼
    [2. Recheck DB]   ─── Uji proxy custom lama di 9Router dengan HTTPS CONNECT
@@ -59,9 +58,9 @@ Kebanyakan proxy scraper publik memasukkan ribuan proxy mati atau proxy palsu ya
           │               ⛔ Relay Vercel & Cloudflare dijamin tidak tersentuh!
           ▼
    [4. Injeksi Fresh]─── Uji kandidat baru (TCP ➔ HTTPS) ➔ HANYA yang hidup masuk ke DB
-          │
+          │               🎯 Smart Early-Exit begitu target proxy hidup tercapai!
           ▼
-   [5. Sort & Verify]─── Rapikan urutan (Custom ➔ Vercel ➔ Cloudflare) + SQLite integrity check
+   [5. Sort & Verify]─── Rapikan urutan (Fastest on Top ➔ Vercel ➔ Cloudflare) + SQLite integrity check
           │
           ▼
    [6. Finish]       ─── Cetak ringkasan hijau ➔ Terminal auto-close dalam 15 detik
@@ -119,6 +118,7 @@ concurrency = 250            # Koneksi paralel untuk kecepatan maksimal
 connect_timeout = 4.0        # Batas waktu TCP connect
 deep_test_timeout = 5.0      # Batas waktu handshake HTTPS CONNECT
 grace_strikes = 2            # Jumlah kegagalan sebelum proxy dihapus
+target_fresh_alive = 800     # Smart Early-Exit: stop begitu 800 proxy hidup tercapai (0 = tanpa batas)
 
 [scope]
 recheck_types = ["http"]     # Hanya tipe http (custom) yang direcheck
@@ -131,26 +131,14 @@ groups = ["http", "vercel", "cloudflare"]
 
 ---
 
-## 📋 Sumber Proxy yang Didukung (26 Feeds)
+## 📋 Sumber Proxy yang Didukung (62 Feeds Terkurasi)
 
-| ID Feed | Sumber | Protokol |
+| Kategori Sumber | Daftar Feed | Karakteristik |
 |---|---|---|
-| `monosans` | [monosans/proxy-list](https://github.com/monosans/proxy-list) | HTTP, SOCKS5 (JSON) |
-| `geonode` | [geonode API](https://geonode.com/free-proxy-list) | HTTP, SOCKS5 (JSON) |
-| `proxyscrape-*` | [proxyscrape v4 API](https://proxyscrape.com) | HTTP, SOCKS5 |
-| `proxifly-*` | [proxifly/free-proxy-list](https://github.com/proxifly/free-proxy-list) | HTTP, SOCKS5 |
-| `thespeedx-*` | [TheSpeedX/PROXY-List](https://github.com/TheSpeedX/PROXY-List) | HTTP, SOCKS5 |
-| `hookzof-socks5` | [hookzof/socks5_list](https://github.com/hookzof/socks5_list) | SOCKS5 |
-| `murongpig-*` | [MuRongPIG/Proxy-Master](https://github.com/MuRongPIG/Proxy-Master) | HTTP, SOCKS5 |
-| `zevtyardt-*` | [zevtyardt/proxy-list](https://github.com/zevtyardt/proxy-list) | HTTP, SOCKS5 |
-| `ercindedeoglu-*` | [ErcinDedeoglu/proxies](https://github.com/ErcinDedeoglu/proxies) | HTTP, HTTPS, SOCKS5 |
-| `jetkai-*` | [jetkai/proxy-list](https://github.com/jetkai/proxy-list) | HTTP, HTTPS, SOCKS5 |
-| `sunny9577-http` | [sunny9577/proxy-scraper](https://github.com/sunny9577/proxy-scraper) | HTTP |
-| `zloi-*` | [zloi-user/hideip.me](https://github.com/zloi-user/hideip.me) | HTTP, SOCKS5 |
-| `vakhov-http` | [vakhov/fresh-proxy-list](https://github.com/vakhov/fresh-proxy-list) | HTTP |
-| `roosterkid-https`| [roosterkid/openproxylist](https://github.com/roosterkid/openproxylist) | HTTPS |
-| `shiftytr-socks5` | [ShiftyTR/Proxy-List](https://github.com/ShiftyTR/Proxy-List) | SOCKS5 |
-| `clarketm` | [clarketm/proxy-list](https://github.com/clarketm/proxy-list) | HTTP |
+| **⚡ Pre-Checked Hourly Feeds** | `dinoz0rg` (HTTP/SOCKS5), `xyzs996` (HTTP/HTTPS), `elliott` (SOCKS5), `proxyspace` (HTTPS/HTTP/SOCKS5), `zloi-connect` | Diuji berkala per 10–60 menit via CI/CD, hit rate tinggi (>40%) |
+| **🌐 High-Frequency Scrapers** | `zaeem20` (HTTP/HTTPS/SOCKS5), `mmpx12` (HTTP/HTTPS/SOCKS5), `sunny9577` (HTTP/All) | Diperbarui setiap 10–60 menit |
+| **🏢 Verified Repositories** | `databay-labs` (HTTP/SOCKS5), `hproxy` (HTTP/HTTPS/SOCKS5), `dpangestuw` (SOCKS5), `iplocate` (SOCKS5), `proxy-free` (SOCKS5) | Kurasi multi-protokol terverifikasi |
+| **📦 Core Massive Pools** | `monosans` (JSON + raw), `geonode` (API JSON), `proxyscrape` (v2 & v4 API), `proxifly` (HTTP/SOCKS5), `thespeedx` (HTTP/SOCKS5), `hookzof` (SOCKS5), `murongpig` (HTTP/SOCKS5), `zevtyardt` (HTTP/SOCKS5), `ercindedeoglu` (HTTP/HTTPS/SOCKS5), `jetkai` (HTTP/HTTPS/SOCKS5), `b4rc0de` (HTTP/SOCKS5), `hendrikbgr`, `almroot`, `shiftytr`, `vakhov`, `roosterkid`, `clarketm`, `stormsia`, `tuanminpay` | Pasokan ribuan kandidat massal dari berbagai benua |
 
 *Menambah atau menonaktifkan sumber cukup mengubah file `sources.json` tanpa perlu mengubah kode.*
 
@@ -171,7 +159,7 @@ groups = ["http", "vercel", "cloudflare"]
 ### Untuk apa repo ini
 
 Alat ini mengumpulkan daftar proxy publik yang **sudah tersedia terbuka** di
-internet (26 feed publik), menguji apakah proxy tersebut benar-benar bisa
+internet (62 feed publik), menguji apakah proxy tersebut benar-benar bisa
 melakukan HTTPS CONNECT, lalu menyuntikkan yang lolos ke database 9Router
 milik Anda sendiri. Tidak ada server pihak ketiga yang dipindai, diuji
 beban, atau diserang.
