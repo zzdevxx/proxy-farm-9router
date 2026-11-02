@@ -21,6 +21,11 @@ import sys
 import time
 from dataclasses import dataclass
 
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+if hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 LOCAL_LIBS = os.path.join(HERE, ".pylibs")
@@ -117,7 +122,7 @@ async def test_single_proxy(proxy_url: str, local_ip: str | None, timeout: float
 
 async def main_async(args) -> int:
     cfg = tomllib.load(open(os.path.join(HERE, "config.toml"), "rb"))
-    db_path = cfg["database"]["path"]
+    db_path = util.resolve_db_path(cfg["database"]["path"])
 
     local_ip = util.get_local_ip()
 

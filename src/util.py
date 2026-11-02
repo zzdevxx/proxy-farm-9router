@@ -101,3 +101,21 @@ def get_local_ip() -> str | None:
     except OSError:
         return None
 
+
+def resolve_db_path(raw_path: str | None = None) -> str:
+    """Resolve 9router data.sqlite path across Windows and Linux."""
+    import os
+    if raw_path:
+        expanded = os.path.expandvars(os.path.expanduser(raw_path))
+        if os.path.exists(expanded):
+            return expanded
+    appdata = os.environ.get("APPDATA")
+    if appdata:
+        win_db = os.path.join(appdata, "9router", "db", "data.sqlite")
+        if os.path.exists(win_db):
+            return win_db
+    home_db = os.path.expanduser("~/.9router/db/data.sqlite")
+    if os.path.exists(home_db):
+        return home_db
+    return raw_path or home_db
+

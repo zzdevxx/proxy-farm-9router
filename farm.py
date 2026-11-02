@@ -19,6 +19,11 @@ import sys
 import time
 from datetime import datetime, timezone
 
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+if hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 
@@ -113,7 +118,7 @@ async def run(args) -> int:
         repo_root=HERE,
     )
 
-    db_path = cfg["database"]["path"]
+    db_path = utilmod.resolve_db_path(cfg["database"]["path"])
     if not os.path.exists(db_path):
         logger.error(f"DB tidak ditemukan: {db_path}")
         return 2

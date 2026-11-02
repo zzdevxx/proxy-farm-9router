@@ -1,7 +1,8 @@
 # proxy-farm-9router — konfigurasi bot
 
 [database]
-path = "/home/zzdree/.9router/db/data.sqlite"
+# Path database 9router (otomatis menyesuaikan %APPDATA%/9router di Windows atau ~/.9router di Linux)
+path = "~/.9router/db/data.sqlite"
 backup_dir = "backups"
 keep_backups = 10
 

@@ -10,17 +10,24 @@ from __future__ import annotations
 import os
 import sys
 
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+if hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 
 import tomllib
 
 from src import db as dbmod
+from src import util as utilmod
 
 
 def main() -> int:
     cfg = tomllib.load(open(os.path.join(HERE, "config.toml"), "rb"))
-    con = dbmod.connect(cfg["database"]["path"])
+    db_path = utilmod.resolve_db_path(cfg["database"]["path"])
+    con = dbmod.connect(db_path)
     con.execute("PRAGMA busy_timeout=60000")
     try:
         before = {r["id"]: r["updatedAt"] for r in dbmod.row_view(con)
