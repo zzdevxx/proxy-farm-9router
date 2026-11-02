@@ -9,7 +9,10 @@ from typing import Iterable
 
 import httpx
 
+from .logger import get_logger
 from .util import parse_endpoint
+
+logger = get_logger("fetch")
 
 
 @dataclass(frozen=True)
@@ -119,19 +122,19 @@ async def _fetch_one(client: httpx.AsyncClient, spec: dict) -> list[Candidate]:
         resp = await client.get(url, timeout=25.0, follow_redirects=True)
         resp.raise_for_status()
     except Exception as exc:  # jaringan/sumber mati: jangan gagalkan seluruh farm
-        print(f"    [{sid}] GAGAL: {type(exc).__name__}: {str(exc)[:70]}")
+        logger.warning("    [%s] GAGAL: %s: %s", sid, type(exc).__name__, str(exc)[:70])
         return []
     if parser_name == "text_ipport":
         cands = list(parser(resp.text, sid, proto))
     else:
         cands = list(parser(resp.content, sid))
-    print(f"    [{sid}] {len(cands)} kandidat ({len(resp.content):,} B)")
+    logger.info("    [%s] %d kandidat (%s B)", sid, len(cands), f"{len(resp.content):,}")
     return cands
 
 
 async def gather(sources: list[dict], max_candidates: int, concurrency: int) -> list[Candidate]:
     """Ambil semua sumber paralel, lalu dedup. Aman walau sumber mati."""
-    print("  [1] FETCH kandidat:")
+    logger.info("  [1] FETCH kandidat:")
     limits = httpx.Limits(max_connections=concurrency, max_keepalive_connections=concurrency)
     async with httpx.AsyncClient(
         limits=limits, headers={"User-Agent": "Mozilla/5.0 proxy-farm-9router/2.0"}
@@ -152,8 +155,13 @@ async def gather(sources: list[dict], max_candidates: int, concurrency: int) -> 
                 all_c.append(b[idx])
 
     unique = _dedupe(all_c)
-    print(f"  [2] DEDUP: {len(all_c):,} kandidat dari {len(source_buckets)} sumber -> {len(unique):,} unik")
+    logger.info(
+        "  [2] DEDUP: %s kandidat dari %d sumber -> %s unik",
+        f"{len(all_c):,}",
+        len(source_buckets),
+        f"{len(unique):,}",
+    )
     if max_candidates and len(unique) > max_candidates:
         unique = unique[:max_candidates]
-        print(f"  [2b] dibatasi max_candidates -> {len(unique):,}")
+        logger.info("  [2b] dibatasi max_candidates -> %s", f"{len(unique):,}")
     return unique

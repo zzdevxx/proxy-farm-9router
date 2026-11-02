@@ -34,6 +34,9 @@ Kebanyakan proxy scraper publik memasukkan ribuan proxy mati atau proxy palsu ya
 - ⚖️ **Fair Round-Robin Sampling:** Sumber masif (100k+) tidak memonopoli slot kandidat; setiap repo mendapat jatah sampling berimbang.
 - 🔒 **Verifikasi HTTPS CONNECT Nyata:** Memvalidasi handshake TLS sungguhan dan memverifikasi respon IP menggunakan parser `ipaddress` murni—menolak 100% halaman CAPTCHA dan error HTML Cloudflare.
 - 🛡️ **Triple-Layer Relay Guard:** Relay Vercel dan Cloudflare Worker bawaan Anda (`*.unnesdev.workers.dev`) **100% READ-ONLY** dan terlindungi di 3 lapis sistem (*scope allowlist* ➔ *db query filter* ➔ *pre-commit assertion*).
+- 📈 **Uptime & Reliability Scoring:** Melacak riwayat keandalan proxy (`successCount`, `failCount`, `successRate` %) dan tanggal uji terakhir. Proxy dengan tingkat keberhasilan tinggi dan stabil otomatis diprioritaskan di baris teratas rotasi 9Router.
+- 🎛️ **Filter Protokol Khusus:** Dukungan flag CLI `--protocol {all,http,https,socks5}` untuk menyaring dan menguji hanya protokol yang Anda inginkan (misal hanya HTTP/HTTPS murni).
+- 📝 **Sistem Logging Terstruktur & Berotasi:** Log eksekusi otomatis disimpan ke `logs/farm.log` (rotasi 5 MB, simpan 5 cadangan) dengan stempel ISO presisi milidetik, level log bertingkat (DEBUG/INFO/WARN/ERROR), dan penanganan crash otomatis (*uncaught exception hook*). Periksa riwayat log kapan saja via `./run.sh --logs` atau `./run.sh --logs-follow`.
 - 🧹 **Two-Strike Grace Reaper:** Proxy yang mati diberi kesempatan 2 kali uji berturut-turut sebelum dihapus agar tidak terbuang hanya karena timeout sesaat.
 - 📊 **Sorting Rapi:** Menjaga urutan tampilan dashboard 9Router tetap teratur: `Custom HTTP/SOCKS5` (teratas) ➔ `Vercel` ➔ `Cloudflare`.
 
@@ -117,6 +120,14 @@ python3 farm.py --dry-run
 # Quick recheck & pangkas proxy mati dari DB saja (super cepat ~30 detik)
 python3 farm.py --recheck-only
 
+# Filter protokol tertentu (misal hanya http, https, atau socks5)
+python3 farm.py --protocol http --dry-run
+
+# Periksa riwayat log operasional terbaru
+./run.sh --logs           # Tampilkan 50 baris log terakhir
+./run.sh --logs-follow    # Ikuti log real-time (live streaming)
+python3 farm.py --logs    # Melalui python langsung
+
 # Rapikan ulang urutan tampilan di dashboard 9Router (tercepat di atas)
 python3 reorder.py
 
@@ -153,6 +164,14 @@ akses berdasarkan wilayah. Tiga hal yang perlu diketahui:
 path = "/home/zzdree/.9router/db/data.sqlite"
 backup_dir = "backups"
 keep_backups = 10
+
+[logging]
+enabled = true
+level = "INFO"               # DEBUG, INFO, WARNING, ERROR
+dir = "logs"
+file = "farm.log"
+max_bytes = 5242880          # 5 MB per file
+backup_count = 5             # Simpan 5 file cadangan berotasi
 
 [farm]
 max_candidates = 15000       # Jumlah kandidat yang diambil per putaran

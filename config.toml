@@ -5,6 +5,14 @@ path = "/home/zzdree/.9router/db/data.sqlite"
 backup_dir = "backups"
 keep_backups = 10
 
+[logging]
+enabled = true
+level = "INFO"          # DEBUG, INFO, WARNING, ERROR
+dir = "logs"
+file = "farm.log"
+max_bytes = 5242880    # 5 MB
+backup_count = 5       # Simpan 5 rotasi cadangan log
+
 [farm]
 max_candidates = 15000
 concurrency = 250

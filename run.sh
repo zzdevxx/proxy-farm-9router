@@ -18,6 +18,31 @@ export PYTHONPATH="$PWD/.pylibs${PYTHONPATH:+:$PYTHONPATH}"
 C_GRN=$'\033[1;32m'; C_YEL=$'\033[1;33m'; C_RED=$'\033[1;31m'
 C_CYN=$'\033[1;36m'; C_RST=$'\033[0m'; C_BLD=$'\033[1m'; C_DIM=$'\033[2m'
 
+# ── Mode Inspeksi Cepat: Baca Log ────────────────────────────────
+if [ "${1:-}" = "--logs" ] || [ "${1:-}" = "-l" ]; then
+  LOG_FILE="logs/farm.log"
+  if [ ! -f "$LOG_FILE" ]; then
+    echo "Belum ada file log di $LOG_FILE."
+    exit 0
+  fi
+  echo "${C_CYN}📄 Menampilkan 50 baris log terakhir ($LOG_FILE):${C_RST}"
+  echo "────────────────────────────────────────────────────────────────"
+  tail -n 50 "$LOG_FILE"
+  echo "────────────────────────────────────────────────────────────────"
+  exit 0
+fi
+
+if [ "${1:-}" = "--logs-follow" ] || [ "${1:-}" = "-f" ]; then
+  LOG_FILE="logs/farm.log"
+  if [ ! -f "$LOG_FILE" ]; then
+    echo "Belum ada file log di $LOG_FILE."
+    exit 0
+  fi
+  echo "${C_CYN}👀 Mengikuti live log ($LOG_FILE) — Tekan Ctrl+C untuk keluar:${C_RST}"
+  tail -f "$LOG_FILE"
+  exit 0
+fi
+
 clear 2>/dev/null || true
 echo "${C_CYN}"
 echo "  ╔════════════════════════════════════════════════════════════════╗"

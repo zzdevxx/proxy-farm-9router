@@ -21,7 +21,10 @@ import json
 from . import db as dbmod
 from . import geo as geomod
 from . import testers
+from .logger import get_logger
 from .util import now_iso
+
+logger = get_logger("modes")
 
 # Protokol yang boleh diaktifkan di mode Indonesia.
 #
@@ -56,13 +59,14 @@ async def _probe_rows(rows, sem, tcp_to: float, deep_to: float, limit: int | Non
     return await asyncio.gather(*[probe(r) for r in targets], return_exceptions=False)
 
 
-async def mode_indonesia(con, cfg, log=print) -> dict:
+async def mode_indonesia(con, cfg, log=None) -> dict:
     """Mode 2 — siapkan kolam berisi proxy Indonesia saja.
 
     Urutannya penting: label negara dulu, baru matikan. Tanpa langkah label,
     baris lama yang belum punya field `country` (warisan v1 `free-*`) akan
     dianggap bukan Indonesia dan ikut dimatikan — padahal sebagiannya proxy ID.
     """
+    log = log or logger.info
     farm_cfg = cfg["farm"]
     before_relay = dbmod.relay_snapshot(con)
     sem = asyncio.Semaphore(farm_cfg.get("concurrency", 250))
@@ -145,12 +149,13 @@ async def mode_indonesia(con, cfg, log=print) -> dict:
     }
 
 
-async def mode_cek_bersihkan(con, cfg, log=print) -> dict:
+async def mode_cek_bersihkan(con, cfg, log=None) -> dict:
     """Mode 3 — uji semua proxy custom, hapus yang mati.
 
     Berbeda dari recheck rutin, mode ini melepas penjaga `only_prune_owned`
     supaya baris warisan v1 (`free-*`) yang sudah mati ikut terbersihkan.
     """
+    log = log or logger.info
     farm_cfg = cfg["farm"]
     before_relay = dbmod.relay_snapshot(con)
     sem = asyncio.Semaphore(farm_cfg.get("concurrency", 250))
@@ -207,12 +212,13 @@ async def mode_cek_bersihkan(con, cfg, log=print) -> dict:
     }
 
 
-def mode_clean(con, cfg, log=print) -> dict:
+def mode_clean(con, cfg, log=None) -> dict:
     """Mode 4 — hapus SEMUA proxy custom. Relay tidak pernah ikut.
 
     Fungsi ini TIDAK meminta konfirmasi sendiri: pemanggil (run.sh / farm.py)
     yang wajib meminta pengguna mengetik HAPUS lebih dulu.
     """
+    log = log or logger.info
     before_relay = dbmod.relay_snapshot(con)
     rows = dbmod.row_view(con)
     akan = [r for r in rows if r["type"] == "http"]
@@ -240,13 +246,14 @@ def mode_clean(con, cfg, log=print) -> dict:
 ID_RENDAH = 20
 
 
-def filter_id_candidates(cands, log=print):
+def filter_id_candidates(cands, log=None):
     """Saring kandidat hasil fetch: hanya yang berlokasi Indonesia.
 
     Dicocokkan lewat exit-IP (kalau tersedia) atau host kandidat. Tanpa
     penyaringan ini, mode Indonesia akan mengisi ulang kolam dengan proxy
     luar negeri yang baru saja dimatikan.
     """
+    log = log or logger.info
     if not cands:
         return []
     hosts = [c.host for c in cands]
@@ -260,13 +267,14 @@ def filter_id_candidates(cands, log=print):
     return out
 
 
-async def tarik_proxy_id(con, cfg, sources, farm_mod, log=print) -> dict:
+async def tarik_proxy_id(con, cfg, sources, farm_mod, log=None) -> dict:
     """Tarik kandidat baru, saring yang ID, uji, lalu suntik ke DB.
 
     Hanya protokol aman yang ikut disuntik, dan hanya kandidat yang benar-benar
     hidup yang masuk. Tujuannya menambah pilihan proxy ID, bukan membanjiri
     kolam — jumlah sumber yang menyasar Indonesia memang sedikit.
     """
+    log = log or logger.info
     farm_cfg = cfg["farm"]
     before_relay = dbmod.relay_snapshot(con)
     sem = asyncio.Semaphore(farm_cfg.get("concurrency", 250))

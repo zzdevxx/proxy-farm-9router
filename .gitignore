@@ -7,3 +7,4 @@ data/*.json
 data/warp/
 *.conf
 .venv/
+logs/*.log

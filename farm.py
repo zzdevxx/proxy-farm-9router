@@ -33,6 +33,7 @@ import tomllib
 from src import db as dbmod
 from src import fetch as fetch_mod
 from src import geo as geomod
+from src import get_logger, setup_logging
 from src import report as report_mod
 from src import testers
 from src import util as utilmod
@@ -88,9 +89,33 @@ def progress(done: int, total: int, extra: str = "") -> None:
 
 async def run(args) -> int:
     cfg = load_config(os.path.join(HERE, "config.toml"))
+
+    if getattr(args, "logs", False):
+        log_dir = cfg.get("logging", {}).get("dir", "logs")
+        log_name = getattr(args, "log_file", None) or cfg.get("logging", {}).get("file", "farm.log")
+        log_path = os.path.join(HERE, log_dir, log_name)
+        if not os.path.exists(log_path):
+            print(f"Belum ada file log di: {log_path}")
+            return 0
+        print(f"📄 Menampilkan 50 baris log terakhir ({log_path}):")
+        print("─" * 66)
+        with open(log_path, "r", encoding="utf-8", errors="ignore") as f:
+            lines = f.readlines()
+            for line in lines[-50:]:
+                print(line, end="")
+        print("─" * 66)
+        return 0
+
+    logger = setup_logging(
+        cfg=cfg,
+        level=getattr(args, "log_level", None),
+        log_file=getattr(args, "log_file", None),
+        repo_root=HERE,
+    )
+
     db_path = cfg["database"]["path"]
     if not os.path.exists(db_path):
-        print(f"DB tidak ditemukan: {db_path}", file=sys.stderr)
+        logger.error(f"DB tidak ditemukan: {db_path}")
         return 2
 
     scope = cfg["scope"]
@@ -104,11 +129,11 @@ async def run(args) -> int:
         keep = set(args.limit_sources.split(","))
         sources = [s for s in sources if s["id"] in keep]
 
-    print("=" * 66)
-    print(f"  proxy-farm-9router  |  {len(sources)} sumber  |  mode: {mode}")
-    print(f"  aman: {', '.join(scope['recheck_types'])} boleh disentuh; "
-          f"vercel/cloudflare READ-ONLY")
-    print("=" * 66)
+    logger.info("=" * 66)
+    logger.info(f"  proxy-farm-9router  |  {len(sources)} sumber  |  mode: {mode}")
+    logger.info(f"  aman: {', '.join(scope['recheck_types'])} boleh disentuh; "
+                f"vercel/cloudflare READ-ONLY")
+    logger.info("=" * 66)
 
     con = dbmod.connect(db_path)
     con.execute("PRAGMA foreign_keys=ON")
@@ -120,51 +145,50 @@ async def run(args) -> int:
         action = getattr(args, "action", None) or "auto"
         if action != "auto":
             if action == "clean" and (getattr(args, "confirm", None) or "") != "HAPUS":
-                print("  mode clean butuh konfirmasi: tambahkan --confirm HAPUS",
-                      file=sys.stderr)
+                logger.error("  mode clean butuh konfirmasi: tambahkan --confirm HAPUS")
                 return 3
             bkp0 = backup_db(db_path, cfg["database"]["backup_dir"],
                              cfg["database"]["keep_backups"])
             if bkp0:
-                print(f"\n  [0] cadangan DB -> {bkp0}")
+                logger.info(f"\n  [0] cadangan DB -> {bkp0}")
             from src import modes as modes_mod
             if action == "indonesia":
-                hasil = await modes_mod.mode_indonesia(con, cfg)
+                hasil = await modes_mod.mode_indonesia(con, cfg, log=logger.info)
                 if hasil.get("id_aktif", 0) < modes_mod.ID_RENDAH:
-                    print(f"\n  [e] proxy ID aktif cuma {hasil.get('id_aktif')} — "
-                          f"menarik kandidat ID baru dari {len(sources)} sumber...")
+                    logger.info(f"\n  [e] proxy ID aktif cuma {hasil.get('id_aktif')} — "
+                                f"menarik kandidat ID baru dari {len(sources)} sumber...")
                     tambah = await modes_mod.tarik_proxy_id(
-                        con, cfg, sources, farm_mod=fetch_mod
+                        con, cfg, sources, farm_mod=fetch_mod, log=logger.info
                     )
                     hasil.update(tambah)
             elif action == "cek":
-                hasil = await modes_mod.mode_cek_bersihkan(con, cfg)
+                hasil = await modes_mod.mode_cek_bersihkan(con, cfg, log=logger.info)
             else:
-                hasil = modes_mod.mode_clean(con, cfg)
-            print("\n" + "=" * 66)
-            print(f"  SELESAI — mode {action}")
-            print("=" * 66)
+                hasil = modes_mod.mode_clean(con, cfg, log=logger.info)
+            logger.info("\n" + "=" * 66)
+            logger.info(f"  SELESAI — mode {action}")
+            logger.info("=" * 66)
             for k, v in hasil.items():
-                print(f"   {k:20s} {v}")
+                logger.info(f"   {k:20s} {v}")
             integ = con.execute("PRAGMA integrity_check(1)").fetchone()[0]
-            print(f"   {'integrity':20s} {integ}")
+            logger.info(f"   {'integrity':20s} {integ}")
             return 0 if integ == "ok" else 1
 
         # ── 1) backup + snapshot kondisi DB ───────────────────────────────
         bkp = backup_db(db_path, cfg["database"]["backup_dir"], cfg["database"]["keep_backups"])
         if bkp:
-            print(f"\n  [0] cadangan DB -> {bkp}")
+            logger.info(f"\n  [0] cadangan DB -> {bkp}")
 
         before = dbmod.row_view(con)
         by_type_before: dict[str, int] = {}
         for r in before:
             by_type_before[r["type"]] = by_type_before.get(r["type"], 0) + 1
-        print("  [0] kondisi DB sekarang: " +
-              ", ".join(f"{k}={v}" for k, v in sorted(by_type_before.items())))
+        logger.info("  [0] kondisi DB sekarang: " +
+                    ", ".join(f"{k}={v}" for k, v in sorted(by_type_before.items())))
 
         # ── 2) fetch kandidat baru + dedup ────────────────────────────────
         if args.recheck_only:
-            print("\n  [1] --recheck-only: lewati unduhan sumber baru")
+            logger.info("\n  [1] --recheck-only: lewati unduhan sumber baru")
             cands = []
             fresh = []
         else:
@@ -172,19 +196,33 @@ async def run(args) -> int:
                 sources, farm_cfg.get("max_candidates", 8000), farm_cfg.get("concurrency", 250)
             )
             if not cands:
-                print("tidak ada kandidat — semua sumber mati?", file=sys.stderr)
+                logger.error("tidak ada kandidat — semua sumber mati?")
                 return 1
 
             # kandidat yang belum ada di DB (berdasarkan proxyUrl)
             known_urls = {r["proxyUrl"] for r in before if r["proxyUrl"]}
             fresh = [c for c in cands if c.proxy_url not in known_urls]
-            print(f"  [2b] {len(fresh)} kandidat benar-benar baru (sisanya sudah ada di DB)")
+            logger.info(f"  [2b] {len(fresh)} kandidat benar-benar baru (sisanya sudah ada di DB)")
 
         # ── 3) RECHECK baris lama (hanya type dalam scope.recheck_types) ──
         recheck_types = set(scope["recheck_types"])
         old_rows = [r for r in before if r["type"] in recheck_types]
-        print(f"\n  [3] RECHECK {human(len(old_rows))} baris lama "
-              f"(type={sorted(recheck_types)})")
+
+        proto_filter = getattr(args, "protocol", "all")
+        if proto_filter and proto_filter != "all":
+            proto_val = proto_filter.lower()
+            if fresh:
+                fresh = [c for c in fresh if c.protocol == proto_val]
+                logger.info(f"  [2c] filter protokol '{proto_val}': tersisa {len(fresh)} kandidat baru")
+            old_rows = [
+                r for r in old_rows
+                if (r.get("data") or {}).get("importedProto") == proto_val
+                or (r.get("proxyUrl") or "").startswith(f"{proto_val}://")
+            ]
+            logger.info(f"  [3-proto] filter recheck protokol '{proto_val}': tersisa {len(old_rows)} baris lama")
+
+        logger.info(f"\n  [3] RECHECK {human(len(old_rows))} baris lama "
+                    f"(type={sorted(recheck_types)})")
 
         sem = asyncio.Semaphore(farm_cfg.get("concurrency", 250))
         tcp_to = farm_cfg.get("connect_timeout", 4.0)
@@ -218,14 +256,14 @@ async def run(args) -> int:
             if done % 250 == 0 or done == total:
                 progress(done, total, f"hidup={alive_old}")
         dead_old = total - alive_old
-        print(f"  [3b] recheck: {alive_old} hidup / {dead_old} mati")
+        logger.info(f"  [3b] recheck: {alive_old} hidup / {dead_old} mati")
 
         # tulis hasil recheck — TIDAK boleh jalan saat --dry-run, karena
         # mark_result menaikkan strike & mematikan isActive. Proxy yang kebetulan
         # lambat saat diuji akan tercopot dari kolam rotasi 9router hanya karena
         # sebuah uji coba.
         if args.dry_run:
-            print(f"  [3c] DRY-RUN: {len(results)} hasil recheck tidak ditulis ke DB")
+            logger.info(f"  [3c] DRY-RUN: {len(results)} hasil recheck tidak ditulis ke DB")
         else:
             now = now_iso()
             con.execute("BEGIN IMMEDIATE")
@@ -241,15 +279,15 @@ async def run(args) -> int:
         prune_stats = {"pruned": [], "skipped_bound": [], "skipped_grace": 0}
         dead_striked = [r for r, v in results if not v.alive and r["owned"]]
         if args.no_prune:
-            print(f"  [4] --no-prune: {len(dead_striked)} baris mati dibiarkan")
+            logger.info(f"  [4] --no-prune: {len(dead_striked)} baris mati dibiarkan")
         elif not dead_striked:
-            print("  [4] tak ada baris mati milik tool -> tak ada yang dipangkas")
+            logger.info("  [4] tak ada baris mati milik tool -> tak ada yang dipangkas")
         else:
             if args.dry_run:
-                print(f"  [4] DRY-RUN: akan memangkas {len(dead_striked)} baris "
-                      f"(strike >= {farm_cfg['grace_strikes']} di run ini)")
+                logger.info(f"  [4] DRY-RUN: akan memangkas {len(dead_striked)} baris "
+                            f"(strike >= {farm_cfg['grace_strikes']} di run ini)")
                 for r in dead_striked[:10]:
-                    print(f"        - {r['name']}")
+                    logger.info(f"        - {r['name']}")
             else:
                 prune_stats = dbmod.prune_dead(
                     con,
@@ -259,9 +297,9 @@ async def run(args) -> int:
                         "grace_strikes": farm_cfg["grace_strikes"],
                     },
                 )
-                print(f"  [4] dipangkas      : {len(prune_stats['pruned'])}")
-                print(f"      ditahan (grace): {prune_stats['skipped_grace']}")
-                print(f"      dilewati (terikat koneksi): {len(prune_stats['skipped_bound'])}")
+                logger.info(f"  [4] dipangkas      : {len(prune_stats['pruned'])}")
+                logger.info(f"      ditahan (grace): {prune_stats['skipped_grace']}")
+                logger.info(f"      dilewati (terikat koneksi): {len(prune_stats['skipped_bound'])}")
 
         # ── 5) INJECT kandidat baru (uji dulu, baru tulis) ───────────────
         new_results = []
@@ -277,8 +315,8 @@ async def run(args) -> int:
             else:
                 deep_note = f"exit-IP utk {deep_n} tercepat"
             mode_note = " [mode: tcp]" if mode == "tcp" else ""
-            print(f"\n  [5] UJI {human(len(fresh))} kandidat baru{target_str}{mode_note} "
-                  f"(tcp dulu, lalu {deep_note})")
+            logger.info(f"\n  [5] UJI {human(len(fresh))} kandidat baru{target_str}{mode_note} "
+                        f"(tcp dulu, lalu {deep_note})")
 
             async def probe_tcp_only(c):
                 """Tahap 1 murah: TCP saja, tanpa mengontak endpoint keluar."""
@@ -319,14 +357,14 @@ async def run(args) -> int:
                 for cand, tcp_v in survived:
                     new_results.append((cand, tcp_v))
                     alive_new += 1
-                print(f"  [5a] mode tcp: {len(survived):,} kandidat lolos TCP disuntik "
-                      f"tanpa uji exit-IP (tanpa jaminan tunnel HTTPS)")
+                logger.info(f"  [5a] mode tcp: {len(survived):,} kandidat lolos TCP disuntik "
+                            f"tanpa uji exit-IP (tanpa jaminan tunnel HTTPS)")
                 deep_taken = []
             else:
                 skipped_deep = len(survived) - deep_n_eff
-                print(f"  [5a] TCP lolos: {len(survived):,} dari {len(fresh):,} kandidat"
-                      + (f" · uji mendalam {deep_n_eff:,} tercepat, dilewati {skipped_deep:,}"
-                         if skipped_deep else " · semuanya diuji mendalam"))
+                logger.info(f"  [5a] TCP lolos: {len(survived):,} dari {len(fresh):,} kandidat"
+                            + (f" · uji mendalam {deep_n_eff:,} tercepat, dilewati {skipped_deep:,}"
+                               if skipped_deep else " · semuanya diuji mendalam"))
                 ranked = sorted(survived, key=lambda it: it[1].latency_ms or 9_999_999)
                 deep_taken = ranked[:deep_n_eff]
 
@@ -346,7 +384,7 @@ async def run(args) -> int:
                     progress(done, total, f"hidup={alive_new}")
                 if target_alive > 0 and alive_new >= target_alive:
                     progress(done, total, f"hidup={alive_new}")
-                    print(f"\n  [5-Exit] 🎯 Target {target_alive} proxy hidup baru tercapai pada pengujian ke-{done:,}!")
+                    logger.info(f"\n  [5-Exit] 🎯 Target {target_alive} proxy hidup baru tercapai pada pengujian ke-{done:,}!")
                     for t in tasks:
                         if not t.done():
                             t.cancel()
@@ -354,28 +392,28 @@ async def run(args) -> int:
             # yang terpangkas oleh batas TIDAK dicatat sebagai "mati" (mereka tidak
             # pernah diuji) — dilaporkan terpisah supaya tidak ada yang hilang diam-diam.
             if skipped_deep:
-                print(f"       {skipped_deep:,} kandidat dilewati tahap mendalam "
-                      f"(batas deep_test_top_n={deep_n}) — tidak masuk DB run ini")
+                logger.info(f"       {skipped_deep:,} kandidat dilewati tahap mendalam "
+                            f"(batas deep_test_top_n={deep_n}) — tidak masuk DB run ini")
             dead_new = sum(1 for _, v in new_results if not v.alive)
-            print(f"  [5b] kandidat baru: {alive_new} hidup / {dead_new} mati "
-                  f"(dari {len(new_results):,} dinilai)")
+            logger.info(f"  [5b] kandidat baru: {alive_new} hidup / {dead_new} mati "
+                        f"(dari {len(new_results):,} dinilai)")
 
             # ── 5c) enrich GeoIP / negara untuk proxy yang hidup ────────────
             alive_fresh = [(c, v) for c, v in new_results if v.alive]
             if alive_fresh:
-                print(f"  [5c] deteksi negara untuk {len(alive_fresh)} proxy hidup (batch GeoIP)...")
+                logger.info(f"  [5c] deteksi negara untuk {len(alive_fresh)} proxy hidup (batch GeoIP)...")
                 geo_stats, isp_stats = geomod.enrich_verdicts_geo(new_results, timeout=6.0)
                 if geo_stats:
                     top_cc = ", ".join(f"{cc}={cnt}" for cc, cnt in list(geo_stats.items())[:8])
-                    print(f"       Negara : {top_cc}")
+                    logger.info(f"       Negara : {top_cc}")
                 if isp_stats:
                     top_isp = ", ".join(f"{isp[:20]}={cnt}" for isp, cnt in list(isp_stats.items())[:5])
-                    print(f"       Top ISP: {top_isp}")
+                    logger.info(f"       Top ISP: {top_isp}")
         elif args.recheck_only:
-            print("\n  [5] --recheck-only: lewati pengujian kandidat baru")
+            logger.info("\n  [5] --recheck-only: lewati pengujian kandidat baru")
 
         if args.dry_run:
-            print("\n  [6] DRY-RUN: tidak menulis kandidat baru ke DB")
+            logger.info("\n  [6] DRY-RUN: tidak menulis kandidat baru ke DB")
             inserted = 0
         else:
             con.execute("BEGIN IMMEDIATE")
@@ -391,10 +429,10 @@ async def run(args) -> int:
                 con.execute("ROLLBACK")
                 raise
             if skipped_deep:
-                print(f"  [6] {inserted} proxy baru masuk ke DB"
-                      f" ({skipped_deep:,} kandidat terpangkas batas deep_test_top_n)")
+                logger.info(f"  [6] {inserted} proxy baru masuk ke DB"
+                            f" ({skipped_deep:,} kandidat terpangkas batas deep_test_top_n)")
             else:
-                print(f"  [6] {inserted} proxy baru masuk ke DB")
+                logger.info(f"  [6] {inserted} proxy baru masuk ke DB")
 
             # ── 6b) OpenCode DeepSeek Validator ─────────────────────────────
             # Validasi nyata: jika proxy tidak bisa dipakai di OpenCode (diblokir 403
@@ -414,35 +452,41 @@ async def run(args) -> int:
                     # Prioritaskan proxy ID dulu, lalu urut latensi terendah
                     active_rows.sort(key=lambda r: (
                         0 if (r["data"] or {}).get("country") == "ID" else 1,
-                        (r["data"] or {}).get("latencyMs") or 999999,
+                        (r["data"] or {}).get("latencyMs") if (r["data"] or {}).get("latencyMs") is not None else 999999,
                     ))
                     # Uji hingga target_verified proxy lolos
-                    print(f"\n  [6b] Validasi OpenCode DeepSeek ({model_oc})...")
+                    logger.info(f"\n  [6b] Validasi OpenCode DeepSeek ({model_oc})...")
                     oc_passed = 0
                     oc_pruned = 0
-                    for r in active_rows:
-                        if oc_passed >= target_verified:
-                            break
-                        ok, reason = await testers.test_opencode_proxy_via_9router(
-                            r["id"], db_path, api_key, model=model_oc, timeout=to_oc
-                        )
-                        if ok:
-                            oc_passed += 1
-                            print(f"       ✅ {r['name']:<36s} -> lolos OpenCode ({reason})")
-                        else:
-                            oc_pruned += 1
-                            print(f"       ❌ {r['name']:<36s} -> DIBUANG: tak bisa dipakai OpenCode ({reason})")
+                    row_orig = con.execute("SELECT data FROM settings WHERE id=1").fetchone()
+                    orig_settings_data = row_orig[0] if row_orig else None
+                    try:
+                        for r in active_rows:
+                            if oc_passed >= target_verified:
+                                break
                             con.execute("BEGIN IMMEDIATE")
-                            try:
-                                con.execute("DELETE FROM proxyPools WHERE id=?", (r["id"],))
-                                con.execute("COMMIT")
-                            except Exception:
-                                con.execute("ROLLBACK")
-                                pass
+                            dbmod.set_opencode_proxy_override(con, r["id"])
+                            con.execute("COMMIT")
 
-                    print(f"       Hasil OpenCode: {oc_passed} lolos dipertahankan / {oc_pruned} dibuang dari DB")
+                            ok, reason = await testers.test_opencode_proxy_request(
+                                api_key, model=model_oc, timeout=to_oc
+                            )
+                            if ok:
+                                oc_passed += 1
+                                logger.info(f"       ✅ {r['name']:<36s} -> lolos OpenCode ({reason})")
+                            else:
+                                oc_pruned += 1
+                                logger.info(f"       ❌ {r['name']:<36s} -> DIBUANG: tak bisa dipakai OpenCode ({reason})")
+                                dbmod.prune_ids(con, [r["id"]])
+                    finally:
+                        if orig_settings_data:
+                            con.execute("BEGIN IMMEDIATE")
+                            con.execute("UPDATE settings SET data=? WHERE id=1", (orig_settings_data,))
+                            con.execute("COMMIT")
+
+                    logger.info(f"       Hasil OpenCode: {oc_passed} lolos dipertahankan / {oc_pruned} dibuang dari DB")
                 else:
-                    print("\n  [6b] 9Router offline di localhost:20128 — validasi OpenCode dilewati")
+                    logger.info("\n  [6b] 9Router offline di localhost:20128 — validasi OpenCode dilewati")
 
         # ── 6) rangkap: vercel/cloudflare tak tersentuh ─────────────────
         after = dbmod.row_view(con)
@@ -462,14 +506,14 @@ async def run(args) -> int:
             except Exception:
                 con.execute("ROLLBACK")
                 raise
-            print(f"  [7] {n} baris disusun (prioritas [ID] di atas): " + " -> ".join(cfg["order"]["groups"]))
+            logger.info(f"  [7] {n} baris disusun (prioritas [ID] di atas): " + " -> ".join(cfg["order"]["groups"]))
 
             # Pastikan 9Router otomatis memutar proxy aktif untuk OpenCode
             ok_strat = dbmod.enable_opencode_strategy(con, "round-robin")
             if ok_strat:
-                print("  [7b] 9Router providerStrategies.opencode -> rotateStrategy: round-robin (aktif)")
+                logger.info("  [7b] 9Router providerStrategies.opencode -> rotateStrategy: round-robin (aktif)")
         else:
-            print("  [7] urutan dilewati (--dry-run / --no-order)")
+            logger.info("  [7] urutan dilewati (--dry-run / --no-order)")
 
         integrity = con.execute("PRAGMA integrity_check(1)").fetchone()[0]
 
@@ -535,15 +579,15 @@ async def run(args) -> int:
             stamp,
         )
 
-        print("\n" + "=" * 66)
-        print("  SELESAI" + ("  (DRY-RUN, DB tak diubah)" if args.dry_run else ""))
-        print("=" * 66)
+        logger.info("\n" + "=" * 66)
+        logger.info("  SELESAI" + ("  (DRY-RUN, DB tak diubah)" if args.dry_run else ""))
+        logger.info("=" * 66)
         for k in ("duration_s", "rechecked", "alive_old", "new_alive", "inserted",
                   "pruned", "held_grace", "http_total", "http_alive", "vercel",
                   "cloudflare", "integrity", "guard_ok"):
-            print(f"   {k:14s} {summary[k]}")
-        print(f"\n   laporan : {mpath}")
-        print(f"   data    : {jpath}")
+            logger.info(f"   {k:14s} {summary[k]}")
+        logger.info(f"\n   laporan : {mpath}")
+        logger.info(f"   data    : {jpath}")
         return 0
     finally:
         con.close()
@@ -567,11 +611,20 @@ def main():
                         "| clean (hapus semua proxy custom)")
     p.add_argument("--confirm", default=None,
                    help="untuk --action clean: isi dengan HAPUS sebagai konfirmasi")
+    p.add_argument("--log-level", choices=["DEBUG", "INFO", "WARNING", "ERROR"], default=None,
+                   help="level detail log (default: INFO / config.toml)")
+    p.add_argument("--log-file", default=None,
+                   help="nama file log khusus di folder logs/ (default: farm.log)")
+    p.add_argument("--logs", action="store_true",
+                   help="tampilkan 50 baris log terakhir dari logs/farm.log dan keluar")
+    p.add_argument("--protocol", choices=["all", "http", "https", "socks5"], default="all",
+                   help="filter protokol proxy tertentu: all (default) | http | https | socks5")
     args = p.parse_args()
     try:
         raise SystemExit(asyncio.run(run(args)))
     except KeyboardInterrupt:
-        print("\ndibatalkan", file=sys.stderr)
+        logger = get_logger()
+        logger.warning("\ndibatalkan oleh pengguna (SIGINT)")
         raise SystemExit(130)
 
 

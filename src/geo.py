@@ -8,11 +8,12 @@ Mendukung querying dalam batch 100 IP sekaligus (efisien & cepat: ~0.5s per 100 
 from __future__ import annotations
 
 import json
-import logging
 import urllib.request
 from typing import Any
 
-logger = logging.getLogger("geo")
+from .logger import get_logger
+
+logger = get_logger("geo")
 
 BATCH_ENDPOINT = "http://ip-api.com/batch"
 

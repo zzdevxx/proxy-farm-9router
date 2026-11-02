@@ -77,7 +77,7 @@ async def tcp_probe(host: str, port: int, timeout: float) -> Verdict:
             pass
     except Exception:
         pass
-    return Verdict(True, latency_ms=int((time.monotonic() - t0) * 1000))
+    return Verdict(True, latency_ms=max(1, int((time.monotonic() - t0) * 1000)))
 
 
 async def live_probe(
@@ -134,7 +134,7 @@ async def live_probe(
                 reason="exit_ip == ip lokal (proxy bocor)",
             )
 
-        latency_ms = int((time.monotonic() - t0) * 1000)
+        latency_ms = max(1, int((time.monotonic() - t0) * 1000))
         return Verdict(
             True,
             exit_ip=exit_ip,
@@ -182,6 +182,48 @@ def get_9router_api_key(db_path: str) -> str | None:
         return None
 
 
+async def test_opencode_proxy_request(
+    api_key: str,
+    base_url: str = "http://localhost:20128",
+    model: str = "oc/deepseek-v4.1-flash-free",
+    timeout: float = 6.0,
+) -> tuple[bool, str]:
+    """Tembak endpoint chat 9router untuk menguji respon model OpenCode."""
+    try:
+        async with httpx.AsyncClient(timeout=timeout) as client:
+            resp = await client.post(
+                f"{base_url}/v1/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {api_key}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "model": model,
+                    "messages": [{"role": "user", "content": "1"}],
+                    "max_tokens": 1,
+                },
+            )
+        body = resp.text
+        if resp.status_code == 200:
+            return True, "200_ok"
+        elif resp.status_code == 403:
+            if "abusive traffic" in body or "FreeTierError" in body:
+                return False, "403_abusive_ip"
+            elif "insufficient_quota" in body:
+                return False, "403_quota_ip"
+            return False, "403_blocked_ip"
+        elif resp.status_code == 429:
+            return False, "429_rate_limited"
+        elif resp.status_code in (502, 504):
+            return False, f"{resp.status_code}_gateway_timeout"
+        else:
+            return False, f"status_{resp.status_code}"
+    except asyncio.TimeoutError:
+        return False, "timeout"
+    except Exception as e:
+        return False, f"error:{type(e).__name__}"
+
+
 async def test_opencode_proxy_via_9router(
     proxy_id: str,
     db_path: str,
@@ -199,42 +241,35 @@ async def test_opencode_proxy_via_9router(
     import json
     import sqlite3
 
+    orig_data = None
     con = sqlite3.connect(db_path, timeout=10)
-    orig_data = con.execute("SELECT data FROM settings WHERE id=1").fetchone()[0]
     try:
+        row = con.execute("SELECT data FROM settings WHERE id=1").fetchone()
+        if not row:
+            return False, "settings_not_found"
+        orig_data = row[0]
         nd = json.loads(orig_data)
         strats = dict(nd.get("providerStrategies") or {})
         strats["opencode"] = {"proxyPoolId": proxy_id, "rotateStrategy": "none"}
         nd["providerStrategies"] = strats
         con.execute("UPDATE settings SET data=? WHERE id=1", (json.dumps(nd),))
         con.commit()
+    except Exception as e:
+        return False, f"db_error:{type(e).__name__}"
+    finally:
         con.close()
 
-        async with httpx.AsyncClient(timeout=timeout) as client:
-            resp = await client.post(
-                f"{base_url}/v1/chat/completions",
-                headers={
-                    "Authorization": f"Bearer {api_key}",
-                    "Content-Type": "application/json",
-                },
-                json={
-                    "model": model,
-                    "messages": [{"role": "user", "content": "1"}],
-                    "max_tokens": 1,
-                },
-            )
-        body = resp.text
-        if resp.status_code == 200:
-            return True, "200_ok"
-        elif "abusive traffic" in body or "FreeTierError" in body:
-            return False, "403_abusive_ip"
-        else:
-            return False, f"status_{resp.status_code}"
-    except Exception as e:
-        return False, f"error:{type(e).__name__}"
+    try:
+        return await test_opencode_proxy_request(
+            api_key, base_url=base_url, model=model, timeout=timeout
+        )
     finally:
-        con_r = sqlite3.connect(db_path, timeout=10)
-        con_r.execute("UPDATE settings SET data=? WHERE id=1", (orig_data,))
-        con_r.commit()
-        con_r.close()
+        if orig_data is not None:
+            try:
+                con_r = sqlite3.connect(db_path, timeout=10)
+                con_r.execute("UPDATE settings SET data=? WHERE id=1", (orig_data,))
+                con_r.commit()
+                con_r.close()
+            except Exception:
+                pass
 

@@ -120,10 +120,13 @@ def order_rows(con, groups: list[str], top_id: str | None = None) -> int:
             d = x.get("data") or {}
             lat = d.get("latencyMs")
             lat_val = lat if (lat is not None and lat > 0) else 999999
+            # Keandalan (reliability): successRate lebih tinggi diprioritaskan
+            succ_rate = float(d.get("successRate") if d.get("successRate") is not None else (100.0 if is_inactive == 0 else 0.0))
+            rel_rank = -succ_rate
             if top_id:
                 cc_rank = 0 if d.get("country") == top_id else 1
-                return (cc_rank, is_inactive, lat_val, x.get("name") or "")
-            return (is_inactive, lat_val, x.get("name") or "")
+                return (cc_rank, is_inactive, rel_rank, lat_val, x.get("name") or "")
+            return (is_inactive, rel_rank, lat_val, x.get("name") or "")
 
         for r in sorted(by_type[g], key=sort_key):
             ts = (base - datetime.timedelta(milliseconds=n))
@@ -356,8 +359,10 @@ def delete_all_of_types(con, types: list[str]) -> dict:
 
     Relay vercel/cloudflare tidak pernah masuk daftar ini — penjaga di
     pemanggil memverifikasi jumlahnya sebelum dan sesudah.
+    Baris yang sedang terikat koneksi provider tetap dilewati demi keamanan integritas.
     """
     placeholders = ",".join("?" for _ in types)
+    bound = bound_connection_ids(con)
     cur = con.cursor()
     cur.execute("BEGIN IMMEDIATE")
     try:
@@ -366,10 +371,16 @@ def delete_all_of_types(con, types: list[str]) -> dict:
             f" IN ({placeholders})",
             types,
         ).fetchall()
+        deleted = 0
+        skipped_bound = 0
         for pid, _d in victims:
+            if pid in bound:
+                skipped_bound += 1
+                continue
             cur.execute("DELETE FROM proxyPools WHERE id=?", (pid,))
+            deleted += 1
         con.execute("COMMIT")
-        return {"deleted": len(victims)}
+        return {"deleted": deleted, "skipped_bound": skipped_bound}
     except Exception:
         try:
             con.execute("ROLLBACK")
@@ -405,12 +416,21 @@ def assert_relays_untouched(before: dict[str, tuple], after: dict[str, tuple]) -
 
 
 def mark_result(con, pid: str, verdict, *, is_new_row: bool, now: str) -> dict:
-    """Tulis hasil uji ke baris: testStatus, lastError, lastTestedAt, strikes."""
-    d = json.loads(con.execute("SELECT data FROM proxyPools WHERE id=?", (pid,)).fetchone()[0])
+    """Tulis hasil uji ke baris: testStatus, lastError, lastTestedAt, strikes, dan reliability score."""
+    row = con.execute("SELECT data FROM proxyPools WHERE id=?", (pid,)).fetchone()
+    if not row:
+        return {"strikes": 0, "status": "unknown"}
+    d = json.loads(row[0])
     d["lastTestedAt"] = now
+
+    success_cnt = int(d.get("successCount") or 0)
+    fail_cnt = int(d.get("failCount") or 0)
+
     if verdict.alive:
         d.pop("lastError", None)
         d["strikes"] = 0
+        success_cnt += 1
+        d["lastSuccessAt"] = now
         if verdict.latency_ms is not None:
             d["latencyMs"] = verdict.latency_ms
         if verdict.exit_ip:
@@ -420,8 +440,16 @@ def mark_result(con, pid: str, verdict, *, is_new_row: bool, now: str) -> dict:
     else:
         d["strikes"] = int(d.get("strikes") or 0) + 1
         d["lastError"] = verdict.reason or "farm: gagal uji"
+        fail_cnt += 1
+        d["lastFailureAt"] = now
         status = "error"
         active = 0
+
+    d["successCount"] = success_cnt
+    d["failCount"] = fail_cnt
+    total_probes = success_cnt + fail_cnt
+    d["successRate"] = round((success_cnt / total_probes) * 100, 1) if total_probes > 0 else 0.0
+
     con.execute(
         "UPDATE proxyPools SET isActive=?, testStatus=?, data=json(?) WHERE id=?",
         (active, status, json.dumps(d), pid),
@@ -446,7 +474,11 @@ def insert_new(con, cand, verdict, now: str) -> None:
         "importedProto": cand.protocol,
         "importedAt": now,
         "lastTestedAt": now,
+        "lastSuccessAt": now,
         "strikes": 0,
+        "successCount": 1,
+        "failCount": 0,
+        "successRate": 100.0,
     }
     if cc and cc != "??":
         payload["country"] = cc
@@ -468,6 +500,22 @@ def insert_new(con, cand, verdict, now: str) -> None:
             now,
         ),
     )
+
+
+def set_opencode_proxy_override(con, proxy_id: str) -> bool:
+    """Arahkan sementara strategi opencode ke satu proxy tertentu untuk pengujian."""
+    try:
+        row = con.execute("SELECT data FROM settings WHERE id=1").fetchone()
+        if not row:
+            return False
+        d = json.loads(row[0])
+        ps = dict(d.get("providerStrategies") or {})
+        ps["opencode"] = {"proxyPoolId": proxy_id, "rotateStrategy": "none"}
+        d["providerStrategies"] = ps
+        con.execute("UPDATE settings SET data=? WHERE id=1", (json.dumps(d),))
+        return True
+    except Exception:
+        return False
 
 
 def enable_opencode_strategy(con, strategy: str = "round-robin") -> bool:
