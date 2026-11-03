@@ -1,4 +1,4 @@
-# 🌾 Proxy Farm 9Router
+﻿# 🌾 Proxy Farm 9Router
 
 <p align="center">
   <img src="https://img.shields.io/badge/Python-3.11%20%7C%203.12-blue?style=for-the-badge&logo=python&logoColor=white" alt="Python Version" />
@@ -257,4 +257,4 @@ Kalau Anda tidak yakin apakah penggunaan Anda melanggar ToS suatu layanan,
 
 ## 📄 Lisensi
 
-Proyek ini dilisensikan di bawah [MIT License](LICENSE) © 2026 Andreas ([@zzdree](https://github.com/zzdree)).
+Proyek ini dilisensikan di bawah [MIT License](LICENSE) © 2026 Andreas ([@zzdree](https://github.com/zzdevxx)).
