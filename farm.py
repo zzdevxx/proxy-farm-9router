@@ -71,6 +71,104 @@ def load_config(path: str) -> dict:
         return tomllib.load(f)
 
 
+def selftest(args) -> int:
+    """Cek kesiapan lingkungan sebelum farm sungguhan. Tidak menyentuh DB.
+
+    Yang diperiksa hanyalah hal yang paling sering bikin run gagal di mesin
+    baru: interpretter terlalu tua, dependensi vendored tak lengkap, DB tak
+    ketemu, 9router mati, dan konsol yang tak bisa mencetak UTF-8.
+    """
+    ok = True
+    print("=" * 66)
+    print("  SELFTEST — proxy-farm-9router")
+    print("=" * 66)
+
+    # 1. Python
+    ver = sys.version_info
+    py_ok = ver >= (3, 11)  # tomllib
+    print(f"   {'ok ' if py_ok else 'X  '} python           {ver.major}.{ver.minor}.{ver.micro} ({sys.executable})")
+    ok &= py_ok
+
+    # 2. Dependensi (dari .pylibs, bukan site-packages mesin)
+    for mod_name in ("httpx", "httpcore", "socksio"):
+        try:
+            mod = __import__(mod_name)
+            origin = getattr(mod, "__file__", "?")
+            vendored = LOCAL_LIBS and origin.startswith(LOCAL_LIBS)
+            tag = "vendored" if vendored else "sistem  "
+            print(f"   ok  {mod_name:<15} {getattr(mod, '__version__', '?'):<10} [{tag}]")
+        except ImportError as exc:
+            print(f"   X   {mod_name:<15} TIDAK ADA ({exc})")
+            ok = False
+
+    # 3. Config
+    try:
+        cfg = load_config(os.path.join(HERE, "config.toml"))
+        f = cfg.get("farm", {})
+        print(f"   ok  config.toml      target={f.get('target_fresh_alive')} "
+              f"deep_top_n={f.get('deep_test_top_n')} strikes={f.get('grace_strikes')}")
+    except Exception as exc:
+        print(f"   X   config.toml      {type(exc).__name__}: {exc}")
+        print("=" * 66)
+        return 2
+
+    # 4. Database 9router
+    db_path = utilmod.resolve_db_path(cfg["database"]["path"])
+    if not os.path.exists(db_path):
+        print(f"   X   database         TIDAK ADA: {db_path}")
+        print("                       Jalankan 9Router sekali dulu agar DB dibuat.")
+        ok = False
+    else:
+        try:
+            con = dbmod.connect(db_path)
+            rows = dbmod.row_view(con)
+            kinds: dict[str, int] = {}
+            for r in rows:
+                kinds[r["type"]] = kinds.get(r["type"], 0) + 1
+            integ = con.execute("PRAGMA integrity_check(1)").fetchone()[0]
+            con.close()
+            ringkas = ", ".join(f"{k}={v}" for k, v in sorted(kinds.items()))
+            print(f"   ok  database         {db_path}")
+            print(f"       isi              {ringkas}  (integritas: {integ})")
+        except Exception as exc:
+            print(f"   X   database         {type(exc).__name__}: {exc}")
+            ok = False
+
+    # 5. 9Router gateway
+    if testers.is_9router_online():
+        key = testers.get_9router_api_key(db_path) if os.path.exists(db_path) else None
+        print(f"   ok  9router          online di localhost:20128 (api key: {'ada' if key else 'TIDAK ADA'})")
+    else:
+        print("   --  9router          OFFLINE di localhost:20128")
+        print("                       Farm tetap jalan, tetapi validasi OpenCode dilewati.")
+
+    # 6. Konsol UTF-8
+    enc = getattr(sys.stdout, "encoding", "?")
+    utf8_ok = str(enc).lower().replace("-", "") in ("utf8", "utf8mb4")
+    print(f"   {'ok ' if utf8_ok else '-- '} konsol           stdout={enc}")
+    if not utf8_ok:
+        print("                       Pakai farm.cmd / farm.ps1 agar UTF-8 disetel.")
+
+    # 7. Tulis akses ke folder kerja
+    for sub in ("logs", "reports", "backups", "data"):
+        d = os.path.join(HERE, sub)
+        try:
+            os.makedirs(d, exist_ok=True)
+            probe = os.path.join(d, ".selftest")
+            with open(probe, "w", encoding="utf-8") as fh:
+                fh.write("x")
+            os.remove(probe)
+            print(f"   ok  tulis {sub:<10} {d}")
+        except Exception as exc:
+            print(f"   X   tulis {sub:<10} {type(exc).__name__}: {exc}")
+            ok = False
+
+    print("=" * 66)
+    print("  SELFTEST LULUS — siap menjalankan farm." if ok else "  SELFTEST GAGAL — perbaiki item bertanda X dulu.")
+    print("=" * 66)
+    return 0 if ok else 1
+
+
 def backup_db(db_path: str, backup_dir: str, keep: int) -> str | None:
     """Salin DB (+WAL) sebelum run. Rotasi: sisakan `keep` cadangan terakhir."""
     return utilmod.backup_db(db_path, backup_dir, keep, HERE)
@@ -82,17 +180,50 @@ def parse_endpoint(url: str) -> tuple[str, int]:
     return host, int(port)
 
 
+def _progress_enabled() -> bool:
+    """Bar progres hanya masuk akal di terminal sungguhan.
+
+    Di Windows, menulis "\\r" ke stdout yang dialihkan (pipe/file/Task
+    Scheduler) melempar `OSError: [Errno 22] Invalid argument` dan mematikan
+    seluruh run di tengah jalan. Diperiksa sekali, bukan per panggilan.
+    """
+    try:
+        if not sys.stdout.isatty():
+            return False
+        # PYTHONIOENCODING bisa memaksa codec yang tak bisa menulis blok.
+        "█".encode(sys.stdout.encoding or "utf-8")
+        return True
+    except (OSError, ValueError, LookupError, AttributeError):
+        return False
+
+
+# Dievaluasi sekali saat import; progress() menurunkannya jadi False kalau
+# terminal hilang di tengah run.
+_PROGRESS_ON = _progress_enabled()
+
+
 def progress(done: int, total: int, extra: str = "") -> None:
     if total <= 0:
         return
+    if not _PROGRESS_ON:
+        # Tanpa terminal: cetak tonggak saja, jangan bar yang menimpa diri.
+        if done == total or done % 1000 == 0:
+            print(f"  {done:,}/{total:,} {extra}".rstrip(), flush=True)
+        return
     filled = int(28 * done / total)
     bar = "█" * filled + "░" * (28 - filled)
-    print(f"\r  {bar} {done:,}/{total:,} {extra}", end="", flush=True)
-    if done >= total:
-        print()
+    try:
+        print(f"\r  {bar} {done:,}/{total:,} {extra}", end="", flush=True)
+        if done >= total:
+            print()
+    except OSError:
+        # Terminal hilang di tengah run (jendela ditutup). Jangan bunuh farm.
+        globals()["_PROGRESS_ON"] = False
 
 
 async def run(args) -> int:
+    global _PROGRESS_ON
+    _PROGRESS_ON = _progress_enabled()
     cfg = load_config(os.path.join(HERE, "config.toml"))
 
     if getattr(args, "logs", False):
@@ -624,7 +755,11 @@ def main():
                    help="tampilkan 50 baris log terakhir dari logs/farm.log dan keluar")
     p.add_argument("--protocol", choices=["all", "http", "https", "socks5"], default="all",
                    help="filter protokol proxy tertentu: all (default) | http | https | socks5")
+    p.add_argument("--selftest", action="store_true",
+                   help="periksa kesiapan lingkungan (python, dependensi, DB, 9router) lalu keluar")
     args = p.parse_args()
+    if args.selftest:
+        raise SystemExit(selftest(args))
     try:
         raise SystemExit(asyncio.run(run(args)))
     except KeyboardInterrupt:

@@ -1,11 +1,12 @@
 ﻿# 🌾 Proxy Farm 9Router
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Python-3.11%20%7C%203.12-blue?style=for-the-badge&logo=python&logoColor=white" alt="Python Version" />
+  <img src="https://img.shields.io/badge/Python-3.11%2B-blue?style=for-the-badge&logo=python&logoColor=white" alt="Python 3.11+" />
   <img src="https://img.shields.io/badge/License-MIT-green?style=for-the-badge" alt="MIT License" />
   <img src="https://img.shields.io/badge/Feeds-62%20Sources-purple?style=for-the-badge&logo=github" alt="62 Sources" />
-  <img src="https://img.shields.io/badge/Candidate%20Pool-750k%2B-orange?style=for-the-badge" alt="750k+ Candidates" />
+  <img src="https://img.shields.io/badge/Candidate%20Pool-500k%2B-orange?style=for-the-badge" alt="500k+ Candidates" />
   <img src="https://img.shields.io/badge/Protocols-HTTP%20%7C%20HTTPS%20%7C%20SOCKS5-blueviolet?style=for-the-badge" alt="Protocols" />
+  <img src="https://img.shields.io/badge/Platforms-Windows%2011%20%7C%20Linux-0078D6?style=for-the-badge&logo=windows11&logoColor=white" alt="Windows 11 and Linux" />
   <img src="https://img.shields.io/badge/Integration-9Router%20Compatible-red?style=for-the-badge" alt="9Router Compatible" />
 </p>
 
@@ -36,7 +37,7 @@ Kebanyakan proxy scraper publik memasukkan ribuan proxy mati atau proxy palsu ya
 - 🛡️ **Triple-Layer Relay Guard:** Relay Vercel dan Cloudflare Worker bawaan Anda (`*.unnesdev.workers.dev`) **100% READ-ONLY** dan terlindungi di 3 lapis sistem (*scope allowlist* ➔ *db query filter* ➔ *pre-commit assertion*).
 - 📈 **Uptime & Reliability Scoring:** Melacak riwayat keandalan proxy (`successCount`, `failCount`, `successRate` %) dan tanggal uji terakhir. Proxy dengan tingkat keberhasilan tinggi dan stabil otomatis diprioritaskan di baris teratas rotasi 9Router.
 - 🎛️ **Filter Protokol Khusus:** Dukungan flag CLI `--protocol {all,http,https,socks5}` untuk menyaring dan menguji hanya protokol yang Anda inginkan (misal hanya HTTP/HTTPS murni).
-- 📝 **Sistem Logging Terstruktur & Berotasi:** Log eksekusi otomatis disimpan ke `logs/farm.log` (rotasi 5 MB, simpan 5 cadangan) dengan stempel ISO presisi milidetik, level log bertingkat (DEBUG/INFO/WARN/ERROR), dan penanganan crash otomatis (*uncaught exception hook*). Periksa riwayat log kapan saja via `./run.sh --logs` atau `./run.sh --logs-follow`.
+- 📝 **Sistem Logging Terstruktur & Berotasi:** Log eksekusi otomatis disimpan ke `logs/farm.log` (rotasi 5 MB, simpan 5 cadangan) dengan stempel ISO presisi milidetik, level log bertingkat (DEBUG/INFO/WARN/ERROR), dan penanganan crash otomatis (*uncaught exception hook*). Periksa riwayat log kapan saja via `farm.cmd --logs`, `farm.ps1 --logs-follow` (Windows), atau `./run.sh --logs` (Linux).
 - 🧹 **Two-Strike Grace Reaper:** Proxy yang mati diberi kesempatan 2 kali uji berturut-turut sebelum dihapus agar tidak terbuang hanya karena timeout sesaat.
 - 📊 **Sorting Rapi:** Menjaga urutan tampilan dashboard 9Router tetap teratur: `Custom HTTP/SOCKS5` (teratas) ➔ `Vercel` ➔ `Cloudflare`.
 
@@ -45,7 +46,11 @@ Kebanyakan proxy scraper publik memasukkan ribuan proxy mati atau proxy palsu ya
 ## 🏗️ Arsitektur & Alur Kerja
 
 ```text
-[Double-Click Shortcut]
+[Double-Click Shortcut "Proxy Farm 9Router"]
+          │
+          ▼
+   [Windows] farm.cmd ─── chcp 65001 · PYTHONPATH=.pylibs · NO_PROXY=*
+   [Linux]   run.sh   ─── export PYTHONPATH=.pylibs
           │
           ▼
    [0. Auto-Backup]  ─── Salin data.sqlite ke backups/pre-run-* (auto-rotate 10)
@@ -69,6 +74,19 @@ Kebanyakan proxy scraper publik memasukkan ribuan proxy mati atau proxy palsu ya
    [6. Finish]       ─── Cetak ringkasan hijau ➔ Terminal auto-close dalam 15 detik
 ```
 
+### Dua mesin, satu repo
+
+| | Windows 11 (Acer Swift 3) — utama | Linux Mint (ASUS X407MA) — cadangan |
+|---|---|---|
+| Launcher | `farm.cmd` / `farm.ps1` + shortcut Desktop | `run.sh` |
+| Python | 3.14.7 di `C:\Program Files\Python314` | `python3` sistem |
+| DB 9Router | `%APPDATA%\9router\db\data.sqlite` | `~/.9router/db/data.sqlite` |
+| Shell | PowerShell 5.1+ / cmd | bash |
+| Log | `farm.ps1 --logs-follow` | `./run.sh --logs-follow` |
+
+`config.toml` dan `sources.json` identik di kedua mesin — resolusi path DB
+otomatis. Tidak ada berkas yang perlu disunting saat berpindah mesin.
+
 ---
 
 ## 📦 Instalasi & Penggunaan
@@ -79,63 +97,81 @@ git clone https://gitlab.com/zzdevxx/proxy-farm-9router.git
 cd proxy-farm-9router
 ```
 
-### 2. Pasang Dependensi
+### 2. Tidak perlu `pip install`
+
+Seluruh dependensi (`httpx`, `httpcore`, `h11`, `anyio`, `sniffio`, `idna`,
+`certifi`, `socksio`) sudah di-vendor ke `.pylibs/` di dalam repo. Launcher
+menambahkan folder itu ke `PYTHONPATH`, jadi repo jalan tanpa menyentuh
+site-packages Python sistem maupun user-site.
+
+Verifikasi kesiapan mesin kapan saja:
 ```bash
-pip install -r requirements.txt
+farm.cmd --selftest        # Windows
+python farm.py --selftest  # lintas platform
 ```
-> *Catatan:* Paket `socksio` (untuk dukungan SOCKS5 di `httpx`) sudah disertakan di folder lokal `.pylibs` sehingga tidak merusak environment Python sistem (PEP 668 compliant).
+
+**Persyaratan:** **Python 3.11 atau lebih baru** (batas bawah dari `tomllib`
+di pustaka standar) dan **tidak ada** paket yang perlu dipasang. Launcher
+Windows mencoba `py -3.14` lalu `py -3` lalu `python` di `PATH`, sehingga
+Python 3.11/3.12/3.13 juga jalan. `--selftest` adalah cara tercepat untuk tahu
+versi mana yang terpakai.
+
+> Satu catatan Windows: `py -3` di mesin ini menunjuk build *free-threaded*
+> (`python3.14t`), yang belum layak untuk beban jaringan ini. Karena itu
+> launcher memprobe `py -3.14` lebih dulu, bukan langsung `py -3`.
 
 ### 3. Jalankan
 
-**Cara Termudah (1 Klik di Desktop Linux/XFCE):**
-Klik ganda ikon **Proxy Farm 9Router** di Desktop Anda, lalu pilih mode
-(otomatis memilih mode 1 dalam 10 detik):
+**Windows 11 (Acer) — 1 klik di Desktop:**
 
-| Menu | Mode | Yang dikerjakan |
-|---|---|---|
-| **1** | Auto penuh | Cek proxy 9Router → buang yang mati → tarik sumber → uji → suntik → rapikan |
-| **2** | Mode Indonesia | Label negara yang kosong → aktifkan **hanya IP Indonesia** → matikan sisanya (tidak dihapus) → taruh ID di atas |
-| **3** | Cek & bersihkan | Uji **semua** proxy custom → hapus yang mati, termasuk sisa lama `free-*` |
-| **4** | Clean total | Hapus **semua** proxy custom (`type=http`) — perlu ketik `HAPUS` |
+Pasang shortcut sekali saja:
+```powershell
+powershell -ExecutionPolicy Bypass -File .\install-shortcut.ps1
+```
+Lalu klik ganda ikon **Proxy Farm 9Router** di Desktop. Jendela menampilkan
+progres dan menutup sendiri dalam 15 detik.
 
-> **Relay vercel & cloudflare tidak pernah disentuh mode apa pun.** Setiap operasi
-> membandingkan keadaan relay sebelum dan sesudah; kalau ada yang hilang atau
-> termatikan, operasi dibatalkan dengan galat, bukan dilanjutkan diam-diam.
+**Windows 11 — lewat terminal:**
+```bat
+farm.cmd                              :: auto penuh, perilaku default
+farm.cmd --selftest                   :: cek kesiapan lingkungan, tidak sentuh DB
+farm.cmd --recheck-only               :: ~30 detik, tanpa unduh sumber baru
+farm.cmd --dry-run                    :: uji semuanya, DB tidak diubah
+farm.cmd --logs                       :: 50 baris log terakhir
+farm.cmd --action indonesia           :: fokus IP Indonesia
+farm.cmd --action cek                 :: uji semua & hapus yang mati
+farm.cmd --action clean --confirm HAPUS
+farm.cmd --protocol socks5 --dry-run
+```
+`farm.ps1` menyediakan hal yang sama plus `--logs-follow` (ikuti log real-time):
+```powershell
+powershell -ExecutionPolicy Bypass -File .\farm.ps1 --logs-follow
+```
 
-**Melalui Terminal:**
+**Linux Mint (ASUS, mesin cadangan) — tetap didukung:**
 ```bash
-# Mode 1 — auto penuh (perilaku default)
 ./run.sh
-
-# Mode lain bisa langsung lewat CLI:
-python3 farm.py --action indonesia      # fokus IP Indonesia untuk geo-restriction
-python3 farm.py --action cek            # uji semua & hapus yang mati
-python3 farm.py --action clean --confirm HAPUS   # bersihkan semua proxy custom
-
-# Uji coba tanpa mengubah isi database (Dry Run)
-# Proxy diuji dan hasilnya dilaporkan, tetapi TIDAK ditulis ke DB:
-# tidak ada strike, tidak ada perubahan isActive, tidak ada pemangkasan.
 python3 farm.py --dry-run
+```
 
-# Quick recheck & pangkas proxy mati dari DB saja (super cepat ~30 detik)
-python3 farm.py --recheck-only
-
-# Filter protokol tertentu (misal hanya http, https, atau socks5)
-python3 farm.py --protocol http --dry-run
-
-# Periksa riwayat log operasional terbaru
-./run.sh --logs           # Tampilkan 50 baris log terakhir
-./run.sh --logs-follow    # Ikuti log real-time (live streaming)
-python3 farm.py --logs    # Melalui python langsung
+**Melalui CLI langsung (kedua OS):**
+```bash
+# Uji kelayakan ketat: TCP -> HTTPS tunnel -> jangkauan API provider AI.
+# Memastikan proxy benar-benar bisa menembus openrouter.ai/api/v1/models.
+python farm.py --selftest
+python verify_9router.py -n 50 --active-only
 
 # Rapikan ulang urutan tampilan di dashboard 9Router (tercepat di atas)
-python3 reorder.py
-
-# Uji kelayakan satu per satu: TCP -> HTTPS tunnel -> jangkauan API provider AI
-# Ini uji paling ketat di repo: memastikan proxy benar-benar bisa menembus
-# openrouter.ai/api/v1/models, bukan sekadar keluar ke internet.
-python3 verify_9router.py -n 50 --active-only
+python reorder.py
 ```
+
+> **Catatan launcher Windows.** `farm.cmd` dan `farm.ps1` melakukan tiga hal
+> yang tidak bisa dilakukan `farm.py` sendiri: menyetel konsol ke UTF-8 (tanpa
+> itu Code Page 437 merusak emoji dan panah), men-set `PYTHONPATH` ke
+> `.pylibs/`, dan menahan jendela 15 detik saat dibuka lewat klik ganda. Kedua
+> skrip juga menyetel `NO_PROXY=*` — kalau proxy sistem ikut campur, uji
+> exit-IP akan menilai proxy kita "hidup" padahal yang keluar proxy
+> perusahaan/ISP, dan pemeriksaan anti-leak jadi tidak bermakna.
 
 ### Catatan mode Indonesia
 
@@ -161,7 +197,10 @@ akses berdasarkan wilayah. Tiga hal yang perlu diketahui:
 
 ```toml
 [database]
-path = "/home/zzdree/.9router/db/data.sqlite"
+# Default Windows 11. resolve_db_path() memakai ini bila ada, lalu jatuh ke
+# %APPDATA%\9router\db\data.sqlite, lalu ~/.9router/db/data.sqlite.
+# Satu file ini dipakai di kedua mesin.
+path = "%APPDATA%/9router/db/data.sqlite"
 backup_dir = "backups"
 keep_backups = 10
 
@@ -174,17 +213,28 @@ max_bytes = 5242880          # 5 MB per file
 backup_count = 5             # Simpan 5 file cadangan berotasi
 
 [farm]
-max_candidates = 15000       # Jumlah kandidat yang diambil per putaran
-concurrency = 250            # Koneksi paralel untuk kecepatan maksimal
+max_candidates = 15000       # Kandidat per putaran (setelah dedup + sampling)
+concurrency = 250            # Koneksi paralel
 connect_timeout = 4.0        # Batas waktu TCP connect
+exit_ip_endpoints = ["https://api.ipify.org", "https://icanhazip.com"]
+deep_test_top_n = 1000       # Batas kandidat yang masuk uji exit-IP (0 = semua)
 deep_test_timeout = 5.0      # Batas waktu handshake HTTPS CONNECT
-grace_strikes = 2            # Jumlah kegagalan sebelum proxy dihapus
-target_fresh_alive = 800     # Smart Early-Exit: stop begitu 800 proxy hidup tercapai (0 = tanpa batas)
+grace_strikes = 1            # Kegagalan sebelum proxy dipangkas dari DB
+target_fresh_alive = 50      # Early-exit begitu target proxy hidup baru tercapai (0 = tanpa batas)
+
+[opencode]
+validate = true              # Validasi nyata ke model OpenCode
+model = "oc/deepseek-v4.1-flash-free"
+timeout = 5.0
+max_verified = 20            # Berhenti setelah 20 proxy lolos
+
+[test]
+mode = "deep"                # deep = TCP + exit-IP, tcp = TCP saja
 
 [scope]
 recheck_types = ["http"]     # Hanya tipe http (custom) yang direcheck
 prune_types = ["http"]       # Vercel & Cloudflare tidak akan pernah dihapus
-only_prune_owned = true      # Hanya menghapus proxy hasil injeksi bot
+only_prune_owned = false     # false = baris v1 warisan (free-*) yang mati ikut dipangkas
 
 [order]
 groups = ["http", "vercel", "cloudflare"]

@@ -1,8 +1,13 @@
 # proxy-farm-9router — konfigurasi bot
 
 [database]
-# Path database 9router (otomatis menyesuaikan %APPDATA%/9router di Windows atau ~/.9router di Linux)
-path = "~/.9router/db/data.sqlite"
+# Path database 9router. Nilai di bawah adalah DEFAULT Windows 11 (Acer).
+# `src/util.resolve_db_path()` menangani tiga hal, berurutan:
+#   1. path di sini, setelah expandvars + expanduser, bila file-nya ada;
+#   2. %APPDATA%\9router\db\data.sqlite bila ada (Windows);
+#   3. ~/.9router/db/data.sqlite (Linux/macOS).
+# Jadi file ini boleh dibiarkan begini di kedua mesin — resolusi otomatis.
+path = "%APPDATA%/9router/db/data.sqlite"
 backup_dir = "backups"
 keep_backups = 10
 
@@ -15,7 +20,9 @@ max_bytes = 5242880    # 5 MB
 backup_count = 5       # Simpan 5 rotasi cadangan log
 
 [farm]
+# Kandidat yang diambil per putaran SETELAH dedup + sampling round-robin.
 max_candidates = 15000
+# Koneksi paralel. 250 terbukti stabil di router rumahan dua mesin ini.
 concurrency = 250
 connect_timeout = 4.0
 
@@ -27,6 +34,8 @@ connect_timeout = 4.0
 #  2. Tidak mengembalikan HTML error / Cloudflare 403 palsu.
 #  3. Tidak membocorkan IP lokal mesin.
 exit_ip_endpoints = ["https://api.ipify.org", "https://icanhazip.com"]
+# Batas kandidat yang masuk uji exit-IP, diambil dari yang TCP-nya tercepat.
+# 0 = uji semua (jauh lebih lama). 1000 cukup untuk mengisi target 50 proxy.
 deep_test_top_n = 1000
 deep_test_timeout = 5.0
 
@@ -34,10 +43,8 @@ deep_test_timeout = 5.0
 # 1 = gagal pada run ini langsung dipangkas dari DB.
 grace_strikes = 1
 
-# Target proxy hidup baru per putaran:
-# Begitu jumlah proxy baru yang terbukti hidup mencapai target ini,
-# pengujian kandidat berikutnya langsung diselesaikan (early-exit hemat waktu).
-# 0 = uji semua kandidat tanpa batas.
+# Target proxy hidup BARU per putaran. Begitu tercapai, sisa kandidat
+# dibatalkan (early-exit hemat waktu). 0 = uji semua tanpa batas.
 target_fresh_alive = 50
 
 [opencode]

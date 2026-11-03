@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
-# proxy-farm-9router — Murni 1-Klik Auto Bot
-# Klik ganda di Desktop -> Langsung jalan penuh tanpa tanya:
+# proxy-farm-9router — launcher Linux/macOS (mesin cadangan ASUS).
+#
+# Mesin utama sekarang Windows 11: pakai farm.cmd / farm.ps1, bukan file ini.
+# File ini dipertahankan supaya ASUS tetap bisa menjalankan auto-farm selama
+# masa transisi. Logika aslinya tetap satu: jalankan farm.py.
+#
+# Klik ganda di Desktop -> langsung jalan penuh tanpa tanya:
 #   1. Recheck DB: Uji proxy lama, kalau tak bisa dipakai di OpenCode -> DIBUANG
 #   2. Harvest 62 Feeds: Tarik kandidat fresh (pool 750k+)
 #   3. Uji Nyata: TCP -> HTTPS CONNECT -> OpenCode deepseek reachability
@@ -10,7 +15,14 @@
 # ⛔ Relay vercel & cloudflare tidak pernah disentuh mode apa pun.
 
 set -uo pipefail
-cd "$(dirname "$(readlink -f "$0")")"
+
+# `readlink -f` tidak ada di macOS; fallback ke $0 biasa.
+_self="$0"
+if command -v readlink >/dev/null 2>&1; then
+  _resolved="$(readlink -f "$0" 2>/dev/null || true)"
+  [ -n "$_resolved" ] && _self="$_resolved"
+fi
+cd "$(dirname "$_self")" || exit 2
 
 # socksio dipasang di .pylibs supaya tak menyentuh Python sistem (PEP 668).
 export PYTHONPATH="$PWD/.pylibs${PYTHONPATH:+:$PYTHONPATH}"

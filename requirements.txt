@@ -1,1 +1,19 @@
-httpx>=0.27
+# proxy-farm-9router — dependensi runtime
+#
+# TIDAK PERLU `pip install` untuk memakai repo ini.
+# Seluruh tumpukan di bawah sudah di-vendor ke folder .pylibs/ dan dimuat
+# lewat PYTHONPATH oleh farm.cmd / farm.ps1. Ini disengaja: mesin ini memakai
+# Python 3.14 dengan user-site terpisah (%APPDATA%\Python\Python314), dan
+# mengandalkan itu membuat repo rapuh di mesin lain.
+#
+# Baris di bawah hanya dokumentasi versi yang di-vendor. Pakai --selftest
+# untuk memverifikasi kehadirannya.
+httpx==0.28.1
+httpcore==1.0.9
+h11==0.16.0
+anyio==4.16.0
+sniffio==1.3.1
+idna==3.20
+certifi==2026.10.23
+socksio==1.0.0
+

@@ -8,3 +8,13 @@ data/warp/
 *.conf
 .venv/
 logs/*.log
+
+# .pylibs = dependensi vendored (httpx, httpcore, socksio, ...).
+# Di-commit dengan sengaja: repo harus jalan tanpa pip install apa pun,
+# dan tanpa bergantung pada user-site Python mesin ini.
+.pylibs/**/__pycache__/
+.pylibs/**/*.pyc
+
+# Artefak launcher Windows
+*.lnk
+farm.log
