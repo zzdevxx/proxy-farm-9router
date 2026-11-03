@@ -75,7 +75,7 @@ Kebanyakan proxy scraper publik memasukkan ribuan proxy mati atau proxy palsu ya
 
 ### 1. Kloning Repositori
 ```bash
-git clone https://gitlab.com/zzdree/proxy-farm-9router.git
+git clone https://gitlab.com/zzdevxx/proxy-farm-9router.git
 cd proxy-farm-9router
 ```
 
@@ -257,4 +257,4 @@ Kalau Anda tidak yakin apakah penggunaan Anda melanggar ToS suatu layanan,
 
 ## 📄 Lisensi
 
-Proyek ini dilisensikan di bawah [MIT License](LICENSE) © 2026 Andreas ([@zzdree](https://github.com/zzdevxx)).
+Proyek ini dilisensikan di bawah [MIT License](LICENSE) © 2026 Andreas ([@zzdevxx](https://github.com/zzdevxx)).
