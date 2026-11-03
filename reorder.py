@@ -3,6 +3,13 @@
 
 Dijalankan manual dari terminal untuk memastikan blok urutannya tetap
 custom -> vercel -> cloudflare tanpa perlu menjalankan proses panjang.
+
+Penting: rangkap relay (vercel/cloudflare) dicek dengan `relay_snapshot()`,
+bukan dengan membandingkan `updatedAt`. `order_rows()` SENGAJA menulis ulang
+stempel `updatedAt` pada SETIAP baris termasuk relay, karena stempel itu
+adalah mekanisme urutannya. Memeriksa `updatedAt` berarti selalu melapor
+pelanggaran palsu — dan melewatkan hal yang benar-benar penting: apakah relay
+masih ada dan masih aktif.
 """
 
 from __future__ import annotations
@@ -30,15 +37,20 @@ def main() -> int:
     con = dbmod.connect(db_path)
     con.execute("PRAGMA busy_timeout=60000")
     try:
-        before = {r["id"]: r["updatedAt"] for r in dbmod.row_view(con)
-                  if r["type"] in ("vercel", "cloudflare")}
+        before = dbmod.relay_snapshot(con)
         con.execute("BEGIN IMMEDIATE")
         n = dbmod.order_rows(con, cfg["order"]["groups"])
         con.execute("COMMIT")
 
-        after = {r["id"]: r["updatedAt"] for r in dbmod.row_view(con)
-                 if r["type"] in ("vercel", "cloudflare")}
-        touched = [i for i, ts in after.items() if before.get(i) != ts]
+        ok = True
+        try:
+            dbmod.assert_relays_untouched(before, dbmod.relay_snapshot(con))
+        except RuntimeError as exc:
+            print(f"  rangkap vercel/cloudflare: ❌ {exc}")
+            ok = False
+        else:
+            print(f"  rangkap vercel/cloudflare: ✅ tak tersentuh "
+                  f"({len(before)} relay, tetap ada & aktif)")
 
         rows = dbmod.row_view(con)
         kinds: dict[str, int] = {}
@@ -46,9 +58,7 @@ def main() -> int:
             kinds[r["type"]] = kinds.get(r["type"], 0) + 1
         print(f"  {n} baris disusun: " + " -> ".join(cfg["order"]["groups"]))
         print("  isi DB: " + ", ".join(f"{k}={v}" for k, v in sorted(kinds.items())))
-        print(f"  rangkap vercel/cloudflare: "
-              f"{'✅ tak tersentuh' if not touched else f'❌ {len(touched)} baris berubah'}")
-        return 0 if not touched else 1
+        return 0 if ok else 1
     finally:
         con.close()
 

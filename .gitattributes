@@ -1,0 +1,22 @@
+# Aturan akhir baris file per tipe.
+# Tanpa ini, git memakai core.autocrlf mesin — dan cmd.exe cukup sensitif soal LF.
+
+* .gitignore output
+
+# Batch & PowerShell: CRLF WAJIB.
+# cmd.exe menangani LF untuk perintah sederhana, tapi goto :label dan blok
+# if (...) multi-baris bisa gagal diam-diam dengan LF.
+*.cmd   text eol=crlf
+*.ps1   text eol=crlf
+*.bat   text eol=crlf
+
+# Shell & Python: LF WAJIB.
+*.sh    text eol=lf
+*.py    text eol=lf
+*.toml  text eol=lf
+*.json  text eol=lf
+*.md    text eol=lf
+
+# Biner: jangan sentuh.
+*.lnk   binary
+*.html  text eol=lf

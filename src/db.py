@@ -317,43 +317,6 @@ def prune_ids(con, ids: list[str]) -> dict:
     }
 
 
-def prune_dead_any_owner(con, prune_types: list[str], now: str) -> dict:
-    """Hapus baris mati TANPA memandang pemiliknya (mode 3 & 4).
-
-    Berbeda dari prune_dead: penjaga `only_prune_owned` sengaja dilepas supaya
-    baris warisan v1 (free-*) yang sudah mati ikut bersih. Baris yang masih
-    `active` tidak pernah disentuh.
-    """
-    rows = row_view(con)
-    bound = bound_connection_ids(con)
-    pruned, skipped_bound = [], []
-    cur = con.cursor()
-    try:
-        cur.execute("BEGIN IMMEDIATE")
-        for r in rows:
-            if r["type"] not in prune_types:
-                continue
-            if r["testStatus"] == "active":
-                continue
-            if r["id"] in bound:
-                skipped_bound.append(r)
-                continue
-            cur.execute("DELETE FROM proxyPools WHERE id=?", (r["id"],))
-            pruned.append({"id": r["id"], "name": r["name"], "url": r["proxyUrl"]})
-        con.execute("COMMIT")
-    except Exception:
-        try:
-            con.execute("ROLLBACK")
-        except Exception:
-            pass
-        raise
-    return {
-        "pruned": pruned,
-        "skipped_bound": [r["name"] for r in skipped_bound],
-        "skipped_grace": 0,
-    }
-
-
 def delete_all_of_types(con, types: list[str]) -> dict:
     """Hapus SEMUA baris bertipe tertentu (mode 4: bersih total).
 

@@ -8,14 +8,20 @@ _HOSTNAME = re.compile(
 
 
 def backup_db(db_path, backup_dir, keep, repo_root):
-    """Salin DB (+WAL) sebelum operasi tulis. Rotasi: sisakan `keep` terbaru.
+    """Salin DB sebelum operasi tulis. Rotasi: sisakan `keep` cadangan terakhir.
 
-    Menyapu 'pre-run-*' maupun 'pre-farm-*' — folder lama dari versi v1
-    tidak boleh tumbuh selamanya.
+    Memakai SQLite Online Backup API, BUKAN copy2 tiga berkas. Menyalin
+    data.sqlite lalu -wal lalu -shm secara terpisah dari database WAL yang
+    sedang dibuka 9router bukan snapshot atomik: kalau 9router commit di
+    antara dua copy itu, hasil cadangan adalah gambar lama + WAL baru yang
+    salt-nya tidak cocok, dan restore-nya diam-diam membuang transaksi
+    (atau gagal `database disk image is malformed`). Backup API meminta
+    read lock internal dan menulis SATU berkas konsisten tanpa perlu -wal/-shm.
     """
     import datetime
     import os
     import shutil
+    import sqlite3
 
     if not os.path.exists(db_path):
         return None
@@ -24,17 +30,44 @@ def backup_db(db_path, backup_dir, keep, repo_root):
     stamp = datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%d-%H%M%S")
     dest = os.path.join(dest_root, f"pre-run-{stamp}")
     os.makedirs(dest, exist_ok=True)
-    shutil.copy2(db_path, os.path.join(dest, "data.sqlite"))
-    for ext in ("-wal", "-shm"):
-        p = db_path + ext
-        if os.path.exists(p):
-            shutil.copy2(p, os.path.join(dest, f"data.sqlite{ext}"))
-    old = sorted(
-        d for d in os.listdir(dest_root) if d.startswith(("pre-run-", "pre-farm-"))
-    )
-    while len(old) > keep:
-        shutil.rmtree(os.path.join(dest_root, old.pop(0)), ignore_errors=True)
+
+    out = os.path.join(dest, "data.sqlite")
+    src = sqlite3.connect(db_path, timeout=60)
+    try:
+        dst = sqlite3.connect(out)
+        try:
+            src.backup(dst)
+        finally:
+            dst.close()
+    finally:
+        src.close()
+
+    evict_old_backups(dest_root, keep)
     return dest
+
+
+def evict_old_backups(dest_root, keep):
+    """Buang cadangan tertua hingga tersisa `keep`.
+
+    Diurutkan berdasar waktu modifikasi, bukan nama. Sort leksikografik atas
+    nama folder salah saat dua awalan hidup berdampingan: "pre-farm-..." selalu
+    terurut sebelum "pre-run-..." apa pun stempelnya, sehingga cadangan dari v1
+    (yang paling tua) terbuang duluan sementara cadangan terbaru ikut terbuang
+    belakangan -- kebalik dari yang diinginkan.
+    """
+    import os
+    import shutil
+
+    if not os.path.isdir(dest_root):
+        return
+    cands = [
+        d for d in os.listdir(dest_root)
+        if d.startswith(("pre-run-", "pre-farm-"))
+        and os.path.isdir(os.path.join(dest_root, d))
+    ]
+    cands.sort(key=lambda d: os.path.getmtime(os.path.join(dest_root, d)))
+    while len(cands) > keep:
+        shutil.rmtree(os.path.join(dest_root, cands.pop(0)), ignore_errors=True)
 
 
 def parse_endpoint(token):

@@ -15,7 +15,27 @@ def stamp_now() -> str:
     return datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
 
 
-def write_reports(outdir: str, payload: dict, stamp: str) -> tuple[str, str]:
+def _prune(outdir: str, keep: int) -> None:
+    """Membatasi laporan yang disimpan: hanya `keep` terbaru per pola.
+
+    Laporan adalah generated artifact — tidak boleh menumpuk. Pruning diukur
+    dari mtime, bukan nama, supaya lintas hari tetap benar. Pola dibedakan
+    supaya laporan farm dan laporan verified-proxies tidak saling mengusir.
+    """
+    import glob, os
+
+    if keep <= 0:
+        return
+    for pattern in ("farm-*.json", "farm-*.md", "verified-proxies-*.json", "verify-*.json"):
+        files = sorted(glob.glob(os.path.join(outdir, pattern)), key=os.path.getmtime)
+        for old in files[:-keep]:
+            try:
+                os.remove(old)
+            except OSError:
+                pass
+
+
+def write_reports(outdir: str, payload: dict, stamp: str, keep: int = 20) -> tuple[str, str]:
     os.makedirs(outdir, exist_ok=True)
     jpath = os.path.join(outdir, f"farm-{stamp}.json")
     with open(jpath, "w", encoding="utf-8") as f:
@@ -69,4 +89,5 @@ def write_reports(outdir: str, payload: dict, stamp: str) -> tuple[str, str]:
     lines.append("")
     with open(mpath, "w", encoding="utf-8") as f:
         f.write("\n".join(lines))
+    _prune(outdir, keep)
     return jpath, mpath

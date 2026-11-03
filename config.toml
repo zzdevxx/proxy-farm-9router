@@ -9,7 +9,11 @@
 # Jadi file ini boleh dibiarkan begini di kedua mesin — resolusi otomatis.
 path = "%APPDATA%/9router/db/data.sqlite"
 backup_dir = "backups"
-keep_backups = 10
+keep_backups = 3
+
+[reports]
+# Laporan adalah generated artifact; hanya ini yang disimpan, sisanya dibuang.
+keep = 20
 
 [logging]
 enabled = true

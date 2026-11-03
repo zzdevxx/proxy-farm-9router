@@ -146,20 +146,6 @@ async def live_probe(
     return Verdict(False, reason=last_err or "no_endpoint_ok")
 
 
-async def deep_probe(
-    proxy_url: str, tcp_timeout: float, deep_timeout: float, local_ip: str | None
-) -> Verdict:
-    """TCP dulu (murah); kalau lolos, naik ke uji jalur HTTPS sungguhan."""
-    host, _, port = proxy_url.rpartition("://")[2].rpartition(":")
-    try:
-        tcp = await tcp_probe(host, int(port), tcp_timeout)
-    except ValueError:
-        return Verdict(False, reason="url_tak_terbaca")
-    if not tcp.alive:
-        return tcp
-    return await live_probe(proxy_url, None, deep_timeout, local_ip)
-
-
 def is_9router_online(base_url: str = "http://localhost:20128") -> bool:
     """Cek apakah gateway 9router aktif di localhost."""
     try:
@@ -222,54 +208,4 @@ async def test_opencode_proxy_request(
         return False, "timeout"
     except Exception as e:
         return False, f"error:{type(e).__name__}"
-
-
-async def test_opencode_proxy_via_9router(
-    proxy_id: str,
-    db_path: str,
-    api_key: str,
-    base_url: str = "http://localhost:20128",
-    model: str = "oc/deepseek-v4.1-flash-free",
-    timeout: float = 6.0,
-) -> tuple[bool, str]:
-    """Uji nyata apakah proxy bisa tembus model DeepSeek di OpenCode via 9Router.
-
-    Jika IP diblokir Cloudflare/OpenCode anti-abuse (403 Abusive Traffic) atau
-    timeout, kembalikan (False, reason).
-    Jika OpenCode merespon token (200 OK), kembalikan (True, '200_ok').
-    """
-    import json
-    import sqlite3
-
-    orig_data = None
-    con = sqlite3.connect(db_path, timeout=10)
-    try:
-        row = con.execute("SELECT data FROM settings WHERE id=1").fetchone()
-        if not row:
-            return False, "settings_not_found"
-        orig_data = row[0]
-        nd = json.loads(orig_data)
-        strats = dict(nd.get("providerStrategies") or {})
-        strats["opencode"] = {"proxyPoolId": proxy_id, "rotateStrategy": "none"}
-        nd["providerStrategies"] = strats
-        con.execute("UPDATE settings SET data=? WHERE id=1", (json.dumps(nd),))
-        con.commit()
-    except Exception as e:
-        return False, f"db_error:{type(e).__name__}"
-    finally:
-        con.close()
-
-    try:
-        return await test_opencode_proxy_request(
-            api_key, base_url=base_url, model=model, timeout=timeout
-        )
-    finally:
-        if orig_data is not None:
-            try:
-                con_r = sqlite3.connect(db_path, timeout=10)
-                con_r.execute("UPDATE settings SET data=? WHERE id=1", (orig_data,))
-                con_r.commit()
-                con_r.close()
-            except Exception:
-                pass
 

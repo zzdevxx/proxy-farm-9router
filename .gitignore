@@ -1,20 +1,16 @@
 __pycache__/
 *.pyc
-backups/
-reports/*.json
-reports/*.md
-data/*.json
-data/warp/
-*.conf
-.venv/
-logs/*.log
 
-# .pylibs = dependensi vendored (httpx, httpcore, socksio, ...).
-# Di-commit dengan sengaja: repo harus jalan tanpa pip install apa pun,
-# dan tanpa bergantung pada user-site Python mesin ini.
+# Artefak runtime — generated, jangan pernah di-commit.
+backups/
+reports/
+logs/
+farm.log
+
+# Artefak launcher (dibuat manual, bukan dari repo).
+*.lnk
+
+# Vendor .pylibs DI-COMMIT dengan sengaja: repo harus jalan tanpa pip install
+# dan tanpa bergantung pada user-site Python mesin mana pun.
 .pylibs/**/__pycache__/
 .pylibs/**/*.pyc
-
-# Artefak launcher Windows
-*.lnk
-farm.log

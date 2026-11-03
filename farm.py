@@ -13,7 +13,6 @@ import argparse
 import asyncio
 import json
 import os
-import shutil
 import socket
 import sys
 import time
@@ -311,9 +310,17 @@ async def run(args) -> int:
             return 0 if integ == "ok" else 1
 
         # ── 1) backup + snapshot kondisi DB ───────────────────────────────
-        bkp = backup_db(db_path, cfg["database"]["backup_dir"], cfg["database"]["keep_backups"])
-        if bkp:
-            logger.info(f"\n  [0] cadangan DB -> {bkp}")
+        # --dry-run tidak menulis apa pun ke DB (semua jalur tulis dibatalkan
+        # oleh pengecekan args.dry_run di bawah), jadi cadangan tidak perlu.
+        # Mengambilnya tetap saja menghabiskan satu slot rotasi 44 MB untuk
+        # melindungi tulisan yang tidak akan terjadi; sepuluh kali dry-run
+        # mengusir semua titik pulih nyata dari jendela keep_backups.
+        if args.dry_run:
+            logger.info("\n  [0] DRY-RUN: tanpa backup (run ini tidak menulis ke DB)")
+        else:
+            bkp = backup_db(db_path, cfg["database"]["backup_dir"], cfg["database"]["keep_backups"])
+            if bkp:
+                logger.info(f"\n  [0] cadangan DB -> {bkp}")
 
         before = dbmod.row_view(con)
         by_type_before: dict[str, int] = {}
@@ -601,7 +608,14 @@ async def run(args) -> int:
                             if oc_passed >= target_verified:
                                 break
                             con.execute("BEGIN IMMEDIATE")
-                            dbmod.set_opencode_proxy_override(con, r["id"])
+                            if not dbmod.set_opencode_proxy_override(con, r["id"]):
+                                con.execute("ROLLBACK")
+                                # Override gagal ditulis: uji berikut mengukur
+                                # proxy yang dipilih 9router, bukan baris ini.
+                                # Memangkas berdasar hasil itu bisa membuang
+                                # proxy sehat. Lewati, jangan menebak.
+                                logger.info(f"       ⚠️  {r['name']:<36s} -> PENULISAN STRATEGIC GAGAL, dilewati")
+                                continue
                             con.execute("COMMIT")
 
                             ok, reason = await testers.test_opencode_proxy_request(
@@ -625,13 +639,21 @@ async def run(args) -> int:
                     logger.info("\n  [6b] 9Router offline di localhost:20128 — validasi OpenCode dilewati")
 
         # ── 6) rangkap: vercel/cloudflare tak tersentuh ─────────────────
+        # Dibandingkan lewat id -> (isActive, type), BUKAN updatedAt.
+        # order_rows() memang menulis ulang stempel updatedAt pada setiap baris
+        # termasuk relay (itu mekanisme urutannya), jadi memeriksa updatedAt
+        # menghasilkan false-positive 100% -- seperti yang terjadi di reorder.py
+        # sebelum diperbaiki ke relay_snapshot(). Yang tidak boleh terjadi hanya:
+        # relay hilang, bertambah, atau dimatikan.
         after = dbmod.row_view(con)
-        vc_before = {r["id"]: r["updatedAt"] for r in before if r["type"] in ("vercel", "cloudflare")}
-        vc_after = {r["id"]: r["updatedAt"] for r in after if r["type"] in ("vercel", "cloudflare")}
-        touched = [i for i, ts in vc_after.items() if vc_before.get(i) != ts]
-        if touched:
-            # Ini tak boleh terjadi. Lebih baik gagal keras daripada diam.
-            raise RuntimeError(f"RANGKAP MELANGAR: {len(touched)} baris vercel/cloudflare berubah")
+        vc_before = {r["id"]: (r["isActive"], r["type"]) for r in before if r["type"] in ("vercel", "cloudflare")}
+        vc_after = {r["id"]: (r["isActive"], r["type"]) for r in after if r["type"] in ("vercel", "cloudflare")}
+        hilang = [i for i in vc_before if i not in vc_after]
+        mati = [i for i, st in vc_after.items() if i in vc_before and st[0] != vc_before[i][0]]
+        if hilang or mati:
+            raise RuntimeError(
+                f"RANGKAP MELANGAR: {len(hilang)} relay hilang, {len(mati)} relay berubah status aktif"
+            )
 
         # ── 7) rapikan urutan (prioritaskan [ID] di atas) ───────────────
         if args.do_order and not args.dry_run:
@@ -709,10 +731,21 @@ async def run(args) -> int:
         for sid, v in new_by_src.items():
             m = merged.setdefault(sid, {"candidates": 0, "alive": 0, "dead": 0})
             m.update(v)
+
+        # Hitungan per protokol, dihitung sungguhan (dulu selalu {}).
+        per_protocol: dict[str, dict] = {}
+        for c in cands:
+            s = per_protocol.setdefault(c.protocol, {"candidates": 0, "alive": 0, "dead": 0})
+            s["candidates"] += 1
+        for c, v in new_results:
+            s = per_protocol.setdefault(c.protocol, {"candidates": 0, "alive": 0, "dead": 0})
+            s["alive" if v.alive else "dead"] += 1
+
         jpath, mpath = report_mod.write_reports(
             os.path.join(HERE, "reports"),
-            {"summary": summary, "per_source": merged, "per_protocol": {}, "fastest": fastest},
+            {"summary": summary, "per_source": merged, "per_protocol": per_protocol, "fastest": fastest},
             stamp,
+            keep=int(cfg.get("reports", {}).get("keep", 20)),
         )
 
         logger.info("\n" + "=" * 66)

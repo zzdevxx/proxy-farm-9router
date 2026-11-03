@@ -1,10 +1,10 @@
-﻿# 🌾 Proxy Farm 9Router
+# 🌾 Proxy Farm 9Router
 
 <p align="center">
   <img src="https://img.shields.io/badge/Python-3.11%2B-blue?style=for-the-badge&logo=python&logoColor=white" alt="Python 3.11+" />
   <img src="https://img.shields.io/badge/License-MIT-green?style=for-the-badge" alt="MIT License" />
   <img src="https://img.shields.io/badge/Feeds-62%20Sources-purple?style=for-the-badge&logo=github" alt="62 Sources" />
-  <img src="https://img.shields.io/badge/Candidate%20Pool-500k%2B-orange?style=for-the-badge" alt="500k+ Candidates" />
+  <img src="https://img.shields.io/badge/Candidate%20Pool-499k%2B-orange?style=for-the-badge" alt="499k Candidates" />
   <img src="https://img.shields.io/badge/Protocols-HTTP%20%7C%20HTTPS%20%7C%20SOCKS5-blueviolet?style=for-the-badge" alt="Protocols" />
   <img src="https://img.shields.io/badge/Platforms-Windows%2011%20%7C%20Linux-0078D6?style=for-the-badge&logo=windows11&logoColor=white" alt="Windows 11 and Linux" />
   <img src="https://img.shields.io/badge/Integration-9Router%20Compatible-red?style=for-the-badge" alt="9Router Compatible" />
@@ -26,11 +26,11 @@ Kebanyakan proxy scraper publik memasukkan ribuan proxy mati atau proxy palsu ya
 
 ## 🚀 Fitur Utama
 
-- 🖱️ **Murni 1-Klik di Desktop:** Cukup klik ganda shortcut di Desktop. Program langsung otomatis bekerja detik itu juga, menampilkan progres rapi, dan menutup otomatis setelah selesai.
-- 🌐 **Koleksi 62 Sumber Global (Termasuk Pre-Checked Feeds):** Mengambil lebih dari **750.000 kandidat** (350.000+ IP unik) dari repositori terkurasi (dinoz0rg, xyzs996, proxyspace, monosans, geonode, databay, hproxy, dpangestuw, zaeem20, mmpx12, hookzof, murongpig, zevtyardt, b4rc0de, roosterkid, dll).
+- 🖱️ **Murni 1-Klik di Folder Project:** Klik ganda `START.cmd` di folder project ini. Program langsung bekerja, menampilkan progres rapi, dan menutup otomatis setelah selesai. Tidak perlu shortcut Desktop.
+- 🌐 **Koleksi 62 Sumber Global (Termasuk Pre-Checked Feeds):** Mengambil **499.549 kandidat** (297.778 unik) dari repositori terkurasi (dinoz0rg, xyzs996, proxyspace, monosans, geonode, databay, hproxy, dpangestuw, zaeem20, mmpx12, hookzof, murongpig, zevtyardt, b4rc0de, roosterkid, dll).
 - 🏷️ **Batch GeoIP & Pelabelan Negara Otomatis:** Otomatis mendeteksi dan memberi label kode negara (`[ID]`, `[SG]`, `[US]`, `[VN]`, `[PH]`) pada nama proxy yang masuk ke 9Router via batch endpoint 100 IP/request.
 - ⚡ **Sorting Latensi Tercepat (Fastest on Top):** Proxy aktif diurutkan berdasarkan ping/latensi terendah (ms terkecil di paling atas) agar respon AI di 9Router selalu ngebut.
-- 🎯 **Smart Early-Exit:** Otomatis berhenti begitu target proxy hidup tercapai (misal 800 IP), memangkas waktu eksekusi hingga 50%.
+- 🎯 **Smart Early-Exit:** Otomatis berhenti begitu target proxy hidup tercapai (target 50 IP), memangkas waktu eksekusi hingga 50%.
 - 🛡️ **Single-Shot Failover & Sanitasi IP Privat:** Membuang IP lokal/privat (127.0.0.1, 10.x, 192.168.x) di awal dan langsung memutus kandidat yang timeout tanpa buang waktu mencoba endpoint cadangan.
 - ⚖️ **Fair Round-Robin Sampling:** Sumber masif (100k+) tidak memonopoli slot kandidat; setiap repo mendapat jatah sampling berimbang.
 - 🔒 **Verifikasi HTTPS CONNECT Nyata:** Memvalidasi handshake TLS sungguhan dan memverifikasi respon IP menggunakan parser `ipaddress` murni—menolak 100% halaman CAPTCHA dan error HTML Cloudflare.
@@ -38,7 +38,7 @@ Kebanyakan proxy scraper publik memasukkan ribuan proxy mati atau proxy palsu ya
 - 📈 **Uptime & Reliability Scoring:** Melacak riwayat keandalan proxy (`successCount`, `failCount`, `successRate` %) dan tanggal uji terakhir. Proxy dengan tingkat keberhasilan tinggi dan stabil otomatis diprioritaskan di baris teratas rotasi 9Router.
 - 🎛️ **Filter Protokol Khusus:** Dukungan flag CLI `--protocol {all,http,https,socks5}` untuk menyaring dan menguji hanya protokol yang Anda inginkan (misal hanya HTTP/HTTPS murni).
 - 📝 **Sistem Logging Terstruktur & Berotasi:** Log eksekusi otomatis disimpan ke `logs/farm.log` (rotasi 5 MB, simpan 5 cadangan) dengan stempel ISO presisi milidetik, level log bertingkat (DEBUG/INFO/WARN/ERROR), dan penanganan crash otomatis (*uncaught exception hook*). Periksa riwayat log kapan saja via `farm.cmd --logs`, `farm.ps1 --logs-follow` (Windows), atau `./run.sh --logs` (Linux).
-- 🧹 **Two-Strike Grace Reaper:** Proxy yang mati diberi kesempatan 2 kali uji berturut-turut sebelum dihapus agar tidak terbuang hanya karena timeout sesaat.
+- 🧹 **One-Strike Grace Reaper:** Proxy yang mati langsung dipangkas pada run ini (`grace_strikes = 1`), supaya DB bersih dari proxy zombie.
 - 📊 **Sorting Rapi:** Menjaga urutan tampilan dashboard 9Router tetap teratur: `Custom HTTP/SOCKS5` (teratas) ➔ `Vercel` ➔ `Cloudflare`.
 
 ---
@@ -56,13 +56,13 @@ Kebanyakan proxy scraper publik memasukkan ribuan proxy mati atau proxy palsu ya
    [0. Auto-Backup]  ─── Salin data.sqlite ke backups/pre-run-* (auto-rotate 10)
           │
           ▼
-   [1. Fetch 62 Feeds] ── Tarik 750k+ kandidat ➔ Round-robin ➔ Dedup ➔ 15k kandidat fresh
+   [1. Fetch 62 Feeds] ── Tarik ~500k kandidat ➔ Round-robin ➔ Dedup ➔ 15k kandidat fresh
           │
           ▼
    [2. Recheck DB]   ─── Uji proxy custom lama di 9Router dengan HTTPS CONNECT
           │
           ▼
-   [3. Grace Reaper] ─── Hapus proxy mati yang sudah mengumpulkan 2 strike
+   [3. Grace Reaper] ─── Hapus proxy mati yang gagal pada run ini (grace_strikes = 1)
           │               ⛔ Relay Vercel & Cloudflare dijamin tidak tersentuh!
           ▼
    [4. Injeksi Fresh]─── Uji kandidat baru (TCP ➔ HTTPS) ➔ HANYA yang hidup masuk ke DB
@@ -78,7 +78,7 @@ Kebanyakan proxy scraper publik memasukkan ribuan proxy mati atau proxy palsu ya
 
 | | Windows 11 (Acer Swift 3) — utama | Linux Mint (ASUS X407MA) — cadangan |
 |---|---|---|
-| Launcher | `farm.cmd` / `farm.ps1` + shortcut Desktop | `run.sh` |
+| Launcher | `START.cmd` / `farm.cmd` / `farm.ps1` (di dalam folder project) | `run.sh` |
 | Python | 3.14.7 di `C:\Program Files\Python314` | `python3` sistem |
 | DB 9Router | `%APPDATA%\9router\db\data.sqlite` | `~/.9router/db/data.sqlite` |
 | Shell | PowerShell 5.1+ / cmd | bash |
@@ -122,14 +122,9 @@ versi mana yang terpakai.
 
 ### 3. Jalankan
 
-**Windows 11 (Acer) — 1 klik di Desktop:**
+**Windows 11 (Acer) — 1 klik dari dalam folder project:**
 
-Pasang shortcut sekali saja:
-```powershell
-powershell -ExecutionPolicy Bypass -File .\install-shortcut.ps1
-```
-Lalu klik ganda ikon **START** di Desktop. Jendela menampilkan progres dan
-menutup sendiri dalam 15 detik.
+Klik ganda `START.cmd` di folder project ini (`D:\ANDREAS\proxy-farm-9router`). Jendela menampilkan progres dan menutup sendiri dalam 15 detik. Tidak ada shortcut Desktop.
 
 `START.cmd` adalah satu-satunya titik masuk yang perlu diingat: tanpa argumen
 dia menjalankan seluruh alur auto-farm, dan dengan argumen dia meneruskannya
@@ -186,7 +181,7 @@ python reorder.py
 
 ### Catatan mode Indonesia
 
-Mode 2 menargetkan **IP lokal Indonesia**, biasanya untuk layanan yang membatasi
+Mode Indonesia menargetkan **IP lokal Indonesia**, biasanya untuk layanan yang membatasi
 akses berdasarkan wilayah. Tiga hal yang perlu diketahui:
 
 1. **Label negara dilengkapi lebih dulu.** Baris lama warisan v1 belum punya
@@ -195,7 +190,7 @@ akses berdasarkan wilayah. Tiga hal yang perlu diketahui:
 2. **Hanya protokol `http`/`https` yang diaktifkan.** Proxy `socks5` dimatikan
    di mode ini. Jumlah proxy ID yang hidup biasanya 20–40 dari ~200 kandidat.
 3. **Tidak ada yang dihapus.** Baris non-ID hanya dimatikan (`isActive=0`), jadi
-   bisa dinyalakan kembali dengan menjalankan mode 1.
+   bisa dinyalakan kembali dengan menjalankan mode auto.
 
 > **Catatan mode uji.** `--dry-run` tidak menulis apa pun ke DB. `--mode tcp` melewati
 > tahap uji exit-IP sepenuhnya: kandidat yang lolos TCP langsung disuntik tanpa bukti
@@ -213,7 +208,7 @@ akses berdasarkan wilayah. Tiga hal yang perlu diketahui:
 # Satu file ini dipakai di kedua mesin.
 path = "%APPDATA%/9router/db/data.sqlite"
 backup_dir = "backups"
-keep_backups = 10
+keep_backups = 3
 
 [logging]
 enabled = true
@@ -270,7 +265,7 @@ groups = ["http", "vercel", "cloudflare"]
 
 1. **Pemeriksaan Kebocoran IP (Anti-Leak):** Bot mendeteksi IP publik lokal secara dinamis. Jika ada proxy yang membocorkan IP lokal Anda, proxy tersebut langsung ditolak.
 2. **Kerahasiaan Prompt & Kredensial:** Proses pengujian hanya mengontak endpoint status netral (`api.ipify.org` / `icanhazip.com`). Tidak ada token, API key, atau prompt pengguna yang pernah dikirim melalui proxy publik selama pengujian.
-3. **Backup Otomatis:** Setiap eksekusi selalu memicu snapshot SQLite ke direktori `backups/`, menjamin database Anda dapat dipulihkan kapan saja.
+3. **Backup Otomatis:** Setiap run yang menulis ke DB memicu snapshot SQLite konsisten (SQLite Online Backup API) ke `backups/pre-run-<stempel>/data.sqlite`, dengan retensi `keep_backups = 3`. Prosedur pulih ada di `RESTORE.md`. Run `--dry-run` tidak membuat backup.
 
 ---
 
