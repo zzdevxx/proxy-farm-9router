@@ -46,7 +46,7 @@ Kebanyakan proxy scraper publik memasukkan ribuan proxy mati atau proxy palsu ya
 ## 🏗️ Arsitektur & Alur Kerja
 
 ```text
-[Double-Click Shortcut "Proxy Farm 9Router"]
+[Double-Click Shortcut "START"]
           │
           ▼
    [Windows] farm.cmd ─── chcp 65001 · PYTHONPATH=.pylibs · NO_PROXY=*
@@ -128,8 +128,19 @@ Pasang shortcut sekali saja:
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\install-shortcut.ps1
 ```
-Lalu klik ganda ikon **Proxy Farm 9Router** di Desktop. Jendela menampilkan
-progres dan menutup sendiri dalam 15 detik.
+Lalu klik ganda ikon **START** di Desktop. Jendela menampilkan progres dan
+menutup sendiri dalam 15 detik.
+
+`START.cmd` adalah satu-satunya titik masuk yang perlu diingat: tanpa argumen
+dia menjalankan seluruh alur auto-farm, dan dengan argumen dia meneruskannya
+apa adanya ke `farm.cmd`:
+
+```bat
+START.cmd                       :: auto-farm penuh (klik ganda juga begini)
+START.cmd --selftest            :: cek kesiapan mesin, tidak menyentuh DB
+START.cmd --recheck-only        :: pangkas proxy mati saja, ~30 detik
+START.cmd --logs                :: 50 baris log terakhir
+```
 
 **Windows 11 — lewat terminal:**
 ```bat

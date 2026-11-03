@@ -1,5 +1,5 @@
 # ============================================================================
-#  install-shortcut.ps1 — pasang shortcut "Proxy Farm 9Router" di Desktop
+#  install-shortcut.ps1 — pasang shortcut START di Desktop
 #
 #  Jalankan sekali setelah repo di-clone di mesin Windows:
 #      pwsh -ExecutionPolicy Bypass -File .\install-shortcut.ps1
@@ -9,9 +9,9 @@
 
 [CmdletBinding()]
 param(
-    [string]$Name = 'Proxy Farm 9Router',
-    # 'cmd'  -> farm.cmd  (paling kompatibel, default)
-    # 'ps1'  -> farm.ps1  (PowerShell, punya mode --logs-follow)
+    [string]$Name = 'START',
+    # 'cmd'  -> START.cmd  (paling kompatibel, default)
+    # 'ps1'  -> farm.ps1   (PowerShell, punya mode --logs-follow)
     [ValidateSet('cmd', 'ps1')]
     [string]$Launcher = 'cmd'
 )
@@ -22,7 +22,7 @@ $desktop = [Environment]::GetFolderPath('Desktop')
 $lnkPath = Join-Path $desktop "$Name.lnk"
 
 if ($Launcher -eq 'cmd') {
-    $target = Join-Path $repo 'farm.cmd'
+    $target = Join-Path $repo 'START.cmd'
     $arguments = ''
 } else {
     # powershell.exe ada di setiap Windows 11; tak perlu bergantung pada pwsh 7.
@@ -43,7 +43,7 @@ try {
     $lnk.TargetPath = $target
     $lnk.Arguments = $arguments
     $lnk.WorkingDirectory = $repo
-    $lnk.Description = 'Farm proxy publik, recheck DB 9Router, buang yang mati, inject yang hidup'
+    $lnk.Description = 'Proxy Farm 9Router - klik ganda untuk menjalankan auto-farm'
     $lnk.IconLocation = "$env:SystemRoot\System32\shell32.dll,17"   # ikon jaringan
     $lnk.WindowStyle = 1
     $lnk.Save()
