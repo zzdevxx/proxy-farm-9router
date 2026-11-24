@@ -33,11 +33,13 @@ set "HERE=%~dp0"
 set "PYTHONPATH=%HERE%.pylibs;%PYTHONPATH%"
 
 REM -- Pilih interpreter ------------------------------------------------------
-REM `py -3.14` dipin spesifik, bukan `py -3`: di mesin ini `py -3` menunjuk ke
-REM build free-threaded python3.14t. Tetapi memilih 3.14 buta juga salah kalau
-REM mesin tujuan hanya punya 3.12/3.13 -- py akan keluar 103 dan farm tak jalan.
-REM Jadi versinya DIPROBE dulu: pakai yang tersedia paling spesifik.
+REM Versi GIL spesifik (`py -3.15`, lalu `py -3.14`) diprobe dulu sebelum
+REM `py -3` agar tidak jatuh ke build free-threaded (mis. python3.14t) jika
+REM ada, sekaligus tetap fallback ke `py -3` pada mesin yang hanya punya 3.12/3.13.
 set "PYRUN="
+if not defined PYRUN (
+    py -3.15 -c "import sys" >nul 2>&1 && set "PYRUN=py -3.15"
+)
 if not defined PYRUN (
     py -3.14 -c "import sys" >nul 2>&1 && set "PYRUN=py -3.14"
 )

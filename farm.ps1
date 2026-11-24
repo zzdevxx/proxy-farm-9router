@@ -45,14 +45,14 @@ $env:PYTHONUTF8 = '1'
 $env:PYTHONPATH = (Join-Path $repo '.pylibs') + [IO.Path]::PathSeparator + $env:PYTHONPATH
 
 # -- Resolusi interpreter: py launcher dulu, lalu python di PATH --------------
-# Mengembalikan array argumen siap-splat: @('py','-3.14') atau @('python').
-# Versinya DIPROBE, bukan diasumsikan: `py -3.14` disukai karena `py -3` di
-# mesin ini menunjuk build free-threaded python3.14t, tetapi mesin tujuan bisa
-# saja hanya punya 3.12/3.13 -- memaksa 3.14 di sana langsung gagal.
+# Mengembalikan array argumen siap-splat: @('py','-3.15') atau @('python').
+# Versinya DIPROBE, bukan diasumsikan: `py -3.15` dicoba dulu, lalu `py -3.14`
+# (menghindari build free-threaded python3.14t jika `py -3` menunjuk ke sana),
+# lalu fallback ke `py -3` untuk mesin yang hanya punya 3.12/3.13.
 function Resolve-Python {
     $py = Get-Command py -ErrorAction SilentlyContinue
     if ($py) {
-        foreach ($ver in @('-3.14', '-3')) {
+        foreach ($ver in @('-3.15', '-3.14', '-3')) {
             & $py.Source $ver -c 'import sys' 2>$null | Out-Null
             if ($LASTEXITCODE -eq 0) { return ,@($py.Source, $ver) }
         }
